@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { useIdentityStore } from "./stores";
+import { useTauriEvents } from "./hooks";
 import { MainLayout } from "./components/layout";
 import { CreateIdentity, UnlockIdentity } from "./components/onboarding";
 import { HarborIcon } from "./components/icons";
@@ -87,6 +88,9 @@ function LoadingScreen() {
 
 function AppContent() {
   const { state, initialize } = useIdentityStore();
+
+  // Set up Tauri event listeners for real-time updates from backend
+  useTauriEvents();
 
   useEffect(() => {
     initialize();

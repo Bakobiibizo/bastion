@@ -61,4 +61,9 @@ export const contactsService = {
   async isBlocked(peerId: string): Promise<boolean> {
     return invoke<boolean>("is_contact_blocked", { peerId });
   },
+
+  /** Request identity exchange with a peer (adds them as a contact) */
+  async requestPeerIdentity(peerId: string): Promise<void> {
+    return invoke<void>("request_peer_identity", { peerId });
+  },
 };

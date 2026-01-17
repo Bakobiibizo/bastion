@@ -1,9 +1,13 @@
 //! Tauri commands for contact management
 
+use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use std::str::FromStr;
 use std::sync::Arc;
+use tauri::State;
+use tracing::info;
 
+use crate::commands::network::NetworkState;
 use crate::error::AppError;
 use crate::services::ContactsService;
 
@@ -143,4 +147,20 @@ pub async fn is_contact_blocked(
     peer_id: String,
 ) -> Result<bool, AppError> {
     contacts_service.is_blocked(&peer_id)
+}
+
+/// Request identity exchange with a peer (adds them as a contact)
+#[tauri::command]
+pub async fn request_peer_identity(
+    network: State<'_, NetworkState>,
+    peer_id: String,
+) -> Result<(), AppError> {
+    let libp2p_peer_id = PeerId::from_str(&peer_id)
+        .map_err(|e| AppError::Validation(format!("Invalid peer ID: {}", e)))?;
+
+    let handle = network.get_handle().await?;
+    handle.request_identity(libp2p_peer_id).await?;
+
+    info!("Requested identity from peer {}", peer_id);
+    Ok(())
 }

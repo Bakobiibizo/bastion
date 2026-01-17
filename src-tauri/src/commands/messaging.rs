@@ -1,12 +1,17 @@
 //! Tauri commands for direct messaging
 
+use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use std::sync::Arc;
 use tauri::State;
+use tracing::info;
 
+use crate::commands::network::NetworkState;
 use crate::db::repositories::Conversation;
 use crate::error::AppError;
-use crate::services::{DecryptedMessage, MessagingService};
+use crate::p2p::protocols::messaging::{DirectMessage, MessagingCodec, MessagingMessage};
+use crate::services::{DecryptedMessage, MessagingService, OutgoingMessage};
 
 /// Message info for the frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,10 +80,28 @@ pub struct SendMessageResult {
     pub sent_at: i64,
 }
 
+/// Convert OutgoingMessage to DirectMessage for network transmission
+fn outgoing_to_direct_message(outgoing: &OutgoingMessage) -> DirectMessage {
+    DirectMessage {
+        message_id: outgoing.message_id.clone(),
+        conversation_id: outgoing.conversation_id.clone(),
+        sender_peer_id: outgoing.sender_peer_id.clone(),
+        recipient_peer_id: outgoing.recipient_peer_id.clone(),
+        content_encrypted: outgoing.content_encrypted.clone(),
+        content_type: outgoing.content_type.clone(),
+        reply_to: outgoing.reply_to.clone(),
+        nonce_counter: outgoing.nonce_counter,
+        lamport_clock: outgoing.lamport_clock,
+        timestamp: outgoing.timestamp,
+        signature: outgoing.signature.clone(),
+    }
+}
+
 /// Send a message to a peer
 #[tauri::command]
 pub async fn send_message(
     messaging_service: State<'_, Arc<MessagingService>>,
+    network: State<'_, NetworkState>,
     peer_id: String,
     content: String,
     content_type: Option<String>,
@@ -86,6 +109,7 @@ pub async fn send_message(
 ) -> Result<SendMessageResult, AppError> {
     let content_type = content_type.unwrap_or_else(|| "text".to_string());
 
+    // Create the encrypted, signed message
     let outgoing = messaging_service.send_message(
         &peer_id,
         &content,
@@ -93,8 +117,21 @@ pub async fn send_message(
         reply_to.as_deref(),
     )?;
 
-    // TODO: Actually send over the network via NetworkService
-    // For now, we just store locally and return
+    // Convert to DirectMessage and encode for network transmission
+    let direct_msg = outgoing_to_direct_message(&outgoing);
+    let msg_wrapper = MessagingMessage::Message(direct_msg);
+    let payload = MessagingCodec::encode(&msg_wrapper)
+        .map_err(|e| AppError::Internal(format!("Failed to encode message: {}", e)))?;
+
+    // Parse the peer ID
+    let libp2p_peer_id = PeerId::from_str(&peer_id)
+        .map_err(|e| AppError::Validation(format!("Invalid peer ID: {}", e)))?;
+
+    // Send over the network
+    let handle = network.get_handle().await?;
+    handle.send_message(libp2p_peer_id, "message".to_string(), payload).await?;
+
+    info!("Message {} sent to peer {}", outgoing.message_id, peer_id);
 
     Ok(SendMessageResult {
         message_id: outgoing.message_id,

@@ -1,8 +1,8 @@
 use crate::error::AppError;
 use crate::p2p::{NetworkConfig, NetworkHandle, NetworkService, NetworkStats, PeerInfo};
-use crate::services::IdentityService;
+use crate::services::{ContactsService, IdentityService, MessagingService};
 use std::sync::Arc;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 use tokio::sync::RwLock;
 use tracing::info;
 
@@ -78,8 +78,11 @@ pub async fn bootstrap_network(
 /// Start the P2P network (called after identity is unlocked)
 #[tauri::command]
 pub async fn start_network(
+    app: AppHandle,
     network: State<'_, NetworkState>,
     identity_service: State<'_, Arc<IdentityService>>,
+    messaging_service: State<'_, Arc<MessagingService>>,
+    contacts_service: State<'_, Arc<ContactsService>>,
 ) -> Result<(), AppError> {
     // Check if identity is unlocked
     if !identity_service.is_unlocked() {
@@ -109,11 +112,15 @@ pub async fn start_network(
 
     // Create network service - clone the Arc to pass to the service
     let identity_arc: Arc<IdentityService> = (*identity_service).clone();
-    let (service, handle, mut event_rx) = NetworkService::new(
+    let (mut service, handle, mut event_rx) = NetworkService::new(
         config,
         identity_arc,
         keypair,
     )?;
+
+    // Inject services for message processing and contact storage
+    service.set_messaging_service((*messaging_service).clone());
+    service.set_contacts_service((*contacts_service).clone());
 
     // Store the handle
     network.set_handle(handle).await;
@@ -125,11 +132,15 @@ pub async fn start_network(
         info!("Network service stopped");
     });
 
-    // Spawn a task to process network events
+    // Spawn a task to process network events and forward to frontend
+    let app_clone = app.clone();
     tokio::spawn(async move {
         while let Some(event) = event_rx.recv().await {
             info!("Network event: {:?}", event);
-            // TODO: Forward events to frontend via Tauri events
+            // Emit event to frontend
+            if let Err(e) = app_clone.emit("harbor:network", &event) {
+                tracing::warn!("Failed to emit network event: {}", e);
+            }
         }
     });
 

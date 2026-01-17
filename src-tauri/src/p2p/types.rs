@@ -67,6 +67,8 @@ pub enum NetworkCommand {
     Disconnect { peer_id: PeerId },
     /// Send a message to a peer
     SendMessage { peer_id: PeerId, protocol: String, payload: Vec<u8> },
+    /// Request identity from a peer
+    RequestIdentity { peer_id: PeerId },
     /// Get current network stats
     GetStats,
     /// Get list of connected peers

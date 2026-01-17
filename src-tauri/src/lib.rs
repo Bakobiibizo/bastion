@@ -150,6 +150,7 @@ pub fn run() {
             commands::remove_contact,
             commands::is_contact,
             commands::is_contact_blocked,
+            commands::request_peer_identity,
             // Permission commands
             commands::grant_permission,
             commands::revoke_permission,

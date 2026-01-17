@@ -13,10 +13,11 @@ use tracing::{debug, error, info, warn};
 
 use super::behaviour::{ChatBehaviour, ChatBehaviourEvent, IdentityExchangeRequest, IdentityExchangeResponse, MessagingRequest, MessagingResponse};
 use super::config::NetworkConfig;
+use super::protocols::messaging::{MessagingCodec, MessagingMessage};
 use super::swarm::build_swarm;
 use super::types::*;
 use crate::error::{AppError, Result};
-use crate::services::IdentityService;
+use crate::services::{ContactsService, IdentityService, MessagingService};
 use std::sync::Arc;
 
 /// Handle to interact with the network service
@@ -94,6 +95,36 @@ impl NetworkHandle {
             .map_err(|_| AppError::Internal("Network service unavailable".into()))?;
         Ok(())
     }
+
+    /// Send a message to a peer
+    pub async fn send_message(&self, peer_id: PeerId, protocol: String, payload: Vec<u8>) -> Result<()> {
+        let (tx, rx) = oneshot::channel();
+        self.command_tx
+            .send((NetworkCommand::SendMessage { peer_id, protocol, payload }, Some(tx)))
+            .await
+            .map_err(|_| AppError::Internal("Network service unavailable".into()))?;
+
+        match rx.await {
+            Ok(NetworkResponse::Ok) => Ok(()),
+            Ok(NetworkResponse::Error(e)) => Err(AppError::Network(e)),
+            _ => Err(AppError::Internal("Unexpected response".into())),
+        }
+    }
+
+    /// Request identity from a peer
+    pub async fn request_identity(&self, peer_id: PeerId) -> Result<()> {
+        let (tx, rx) = oneshot::channel();
+        self.command_tx
+            .send((NetworkCommand::RequestIdentity { peer_id }, Some(tx)))
+            .await
+            .map_err(|_| AppError::Internal("Network service unavailable".into()))?;
+
+        match rx.await {
+            Ok(NetworkResponse::Ok) => Ok(()),
+            Ok(NetworkResponse::Error(e)) => Err(AppError::Network(e)),
+            _ => Err(AppError::Internal("Unexpected response".into())),
+        }
+    }
 }
 
 /// The network service manages the libp2p swarm
@@ -101,6 +132,8 @@ pub struct NetworkService {
     swarm: Swarm<ChatBehaviour>,
     config: NetworkConfig,
     identity_service: Arc<IdentityService>,
+    messaging_service: Option<Arc<MessagingService>>,
+    contacts_service: Option<Arc<ContactsService>>,
     command_rx: mpsc::Receiver<(NetworkCommand, Option<oneshot::Sender<NetworkResponse>>)>,
     event_tx: mpsc::Sender<NetworkEvent>,
     connected_peers: HashMap<PeerId, PeerInfo>,
@@ -129,6 +162,8 @@ impl NetworkService {
             swarm,
             config,
             identity_service,
+            messaging_service: None,
+            contacts_service: None,
             command_rx,
             event_tx,
             connected_peers: HashMap::new(),
@@ -142,9 +177,36 @@ impl NetworkService {
         Ok((service, handle, event_rx))
     }
 
+    /// Set the messaging service for processing incoming messages
+    pub fn set_messaging_service(&mut self, service: Arc<MessagingService>) {
+        self.messaging_service = Some(service);
+    }
+
+    /// Set the contacts service for storing contacts from identity exchange
+    pub fn set_contacts_service(&mut self, service: Arc<ContactsService>) {
+        self.contacts_service = Some(service);
+    }
+
     /// Get the local peer ID
     pub fn local_peer_id(&self) -> &PeerId {
         self.swarm.local_peer_id()
+    }
+
+    /// Create an identity exchange request
+    fn create_identity_request(&self) -> Result<IdentityExchangeRequest> {
+        let info = self.identity_service.get_identity_info()?
+            .ok_or_else(|| AppError::NotFound("No identity".to_string()))?;
+
+        let timestamp = chrono::Utc::now().timestamp();
+        let signature = self.identity_service.sign_raw(
+            format!("{}:{}", info.peer_id, timestamp).as_bytes()
+        )?;
+
+        Ok(IdentityExchangeRequest {
+            requester_peer_id: info.peer_id,
+            timestamp,
+            signature,
+        })
     }
 
     /// Start listening on configured addresses
@@ -410,7 +472,36 @@ impl NetworkService {
             "Got identity from {}: {} ({})",
             peer, response.display_name, response.peer_id
         );
-        // TODO: Store in contacts database, verify signature
+
+        // Store in contacts database if we have the contacts service
+        if let Some(ref contacts_service) = self.contacts_service {
+            // Verify the response peer ID matches the peer we received from
+            if response.peer_id != peer.to_string() {
+                warn!("Identity response peer ID mismatch: expected {}, got {}", peer, response.peer_id);
+                return;
+            }
+
+            // TODO: Verify signature on the response
+            // For now, we trust the identity since we're getting it from a direct connection
+
+            match contacts_service.add_contact(
+                &response.peer_id,
+                &response.public_key,
+                &response.x25519_public,
+                &response.display_name,
+                response.avatar_hash.as_deref(),
+                response.bio.as_deref(),
+            ) {
+                Ok(contact_id) => {
+                    info!("Added contact {} with ID {}", response.display_name, contact_id);
+                }
+                Err(e) => {
+                    warn!("Failed to add contact: {}", e);
+                }
+            }
+        } else {
+            warn!("No contacts service configured, cannot store identity");
+        }
     }
 
     async fn handle_messaging_request(
@@ -420,18 +511,65 @@ impl NetworkService {
         request: MessagingRequest,
         channel: ResponseChannel<MessagingResponse>,
     ) {
-        // TODO: Process incoming message, store, emit event
+        // Decode the message payload
+        let msg_result = MessagingCodec::decode(&request.payload);
+
+        let (success, message_id, error) = match msg_result {
+            Ok(MessagingMessage::Message(direct_msg)) => {
+                info!("Received direct message {} from {}", direct_msg.message_id, peer);
+
+                // Process the message if we have a messaging service
+                if let Some(ref messaging_service) = self.messaging_service {
+                    match messaging_service.process_incoming_message(
+                        &direct_msg.message_id,
+                        &direct_msg.conversation_id,
+                        &direct_msg.sender_peer_id,
+                        &direct_msg.recipient_peer_id,
+                        &direct_msg.content_encrypted,
+                        &direct_msg.content_type,
+                        direct_msg.reply_to.as_deref(),
+                        direct_msg.nonce_counter,
+                        direct_msg.lamport_clock,
+                        direct_msg.timestamp,
+                        &direct_msg.signature,
+                    ) {
+                        Ok(_) => {
+                            info!("Message {} processed successfully", direct_msg.message_id);
+                            (true, Some(direct_msg.message_id.clone()), None)
+                        }
+                        Err(e) => {
+                            warn!("Failed to process message {}: {}", direct_msg.message_id, e);
+                            (false, Some(direct_msg.message_id.clone()), Some(e.to_string()))
+                        }
+                    }
+                } else {
+                    warn!("No messaging service configured, cannot process message");
+                    (false, Some(direct_msg.message_id), Some("Messaging service not available".to_string()))
+                }
+            }
+            Ok(MessagingMessage::Ack(ack)) => {
+                info!("Received message ack for {} from {}", ack.message_id, peer);
+                // TODO: Process acknowledgment (update message status)
+                (true, Some(ack.message_id), None)
+            }
+            Err(e) => {
+                warn!("Failed to decode messaging payload: {}", e);
+                (false, None, Some(format!("Failed to decode: {}", e)))
+            }
+        };
+
+        // Send response
         let response = MessagingResponse {
-            success: true,
-            message_id: None,
-            error: None,
+            success,
+            message_id,
+            error,
         };
 
         if let Err(e) = self.swarm.behaviour_mut().messaging.send_response(channel, response) {
             warn!("Failed to send messaging response: {:?}", e);
         }
 
-        // Emit event for the application layer
+        // Emit event for the application layer (for UI updates)
         let _ = self.event_tx.send(NetworkEvent::MessageReceived {
             peer_id: peer.to_string(),
             protocol: "messaging".to_string(),
@@ -465,6 +603,17 @@ impl NetworkService {
                 };
                 self.swarm.behaviour_mut().messaging.send_request(&peer_id, request);
                 NetworkResponse::Ok
+            }
+
+            NetworkCommand::RequestIdentity { peer_id } => {
+                // Create identity request
+                match self.create_identity_request() {
+                    Ok(request) => {
+                        self.swarm.behaviour_mut().identity_exchange.send_request(&peer_id, request);
+                        NetworkResponse::Ok
+                    }
+                    Err(e) => NetworkResponse::Error(format!("Failed to create identity request: {}", e)),
+                }
             }
 
             NetworkCommand::GetStats => {

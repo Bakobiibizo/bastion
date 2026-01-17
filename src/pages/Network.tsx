@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useIdentityStore, useNetworkStore } from "../stores";
+import { contactsService } from "../services/contacts";
 import {
   NetworkIcon,
   UserIcon,
@@ -679,7 +680,14 @@ export function NetworkPage() {
                             color: "hsl(var(--harbor-success))",
                           }}
                           title={`Add ${friendlyName} to contacts`}
-                          onClick={() => toast.success(`${friendlyName} added to contacts!`)}
+                          onClick={async () => {
+                            try {
+                              await contactsService.requestPeerIdentity(peer.peerId);
+                              toast.success(`Requesting identity from ${friendlyName}...`);
+                            } catch (e) {
+                              toast.error(`Failed to add contact: ${e}`);
+                            }
+                          }}
                         >
                           <CheckIcon className="w-4 h-4" />
                         </button>
