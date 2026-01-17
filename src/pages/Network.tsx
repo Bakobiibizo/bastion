@@ -1,5 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useIdentityStore, useNetworkStore } from "../stores";
+import {
+  NetworkIcon,
+  UserIcon,
+  UsersIcon,
+  SearchIcon,
+  PlusIcon,
+  CheckIcon,
+  XIcon,
+} from "../components/icons";
 
 export function NetworkPage() {
   const { state } = useIdentityStore();
@@ -16,6 +25,9 @@ export function NetworkPage() {
     refreshStats,
     checkStatus,
   } = useNetworkStore();
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<"peers" | "contacts">("peers");
 
   const identity = state.status === "unlocked" ? state.identity : null;
 
@@ -49,170 +61,565 @@ export function NetworkPage() {
     return `${secs}s`;
   };
 
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const filteredPeers = connectedPeers.filter(
+    (peer) =>
+      peer.peerId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      peer.addresses.some((addr) =>
+        addr.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+  );
+
   return (
-    <div className="h-full p-6 overflow-y-auto">
-      <div className="max-w-2xl mx-auto">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-          Network
-        </h2>
-
-        {/* Network Status Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                P2P Network
-              </h3>
-              <p className="text-sm mt-1">
-                {status === "connected" && (
-                  <span className="text-green-600 dark:text-green-400">Connected</span>
-                )}
-                {status === "connecting" && (
-                  <span className="text-yellow-600 dark:text-yellow-400">Connecting...</span>
-                )}
-                {status === "disconnected" && (
-                  <span className="text-gray-500 dark:text-gray-400">Disconnected</span>
-                )}
-              </p>
-            </div>
-            <button
-              onClick={isRunning ? stopNetwork : startNetwork}
-              disabled={isLoading || state.status !== "unlocked"}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                isRunning
-                  ? "bg-red-600 hover:bg-red-700 text-white"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
-              } ${isLoading || state.status !== "unlocked" ? "opacity-50 cursor-not-allowed" : ""}`}
+    <div
+      className="h-full flex flex-col"
+      style={{ background: "hsl(var(--harbor-bg-primary))" }}
+    >
+      {/* Header */}
+      <header
+        className="px-6 py-4 border-b flex-shrink-0"
+        style={{ borderColor: "hsl(var(--harbor-border-subtle))" }}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h1
+              className="text-xl font-bold"
+              style={{ color: "hsl(var(--harbor-text-primary))" }}
             >
-              {isLoading
-                ? "..."
-                : isRunning
-                  ? "Stop Network"
-                  : "Start Network"}
-            </button>
-          </div>
-
-          {state.status !== "unlocked" && !isRunning && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-              Unlock your identity to start the network
+              Network
+            </h1>
+            <p
+              className="text-sm mt-0.5"
+              style={{ color: "hsl(var(--harbor-text-secondary))" }}
+            >
+              Manage your connections and contacts
             </p>
-          )}
+          </div>
+
+          {/* Network toggle button */}
+          <button
+            onClick={isRunning ? stopNetwork : startNetwork}
+            disabled={isLoading || state.status !== "unlocked"}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: isRunning
+                ? "hsl(var(--harbor-error) / 0.1)"
+                : "linear-gradient(135deg, hsl(var(--harbor-primary)), hsl(var(--harbor-accent)))",
+              color: isRunning ? "hsl(var(--harbor-error))" : "white",
+              border: isRunning
+                ? "1px solid hsl(var(--harbor-error) / 0.2)"
+                : "none",
+              boxShadow: isRunning
+                ? "none"
+                : "0 4px 12px hsl(var(--harbor-primary) / 0.3)",
+            }}
+          >
+            {isLoading ? (
+              <div
+                className="w-4 h-4 border-2 rounded-full animate-spin"
+                style={{
+                  borderColor: isRunning
+                    ? "hsl(var(--harbor-error) / 0.3)"
+                    : "rgba(255,255,255,0.3)",
+                  borderTopColor: isRunning
+                    ? "hsl(var(--harbor-error))"
+                    : "white",
+                }}
+              />
+            ) : isRunning ? (
+              <XIcon className="w-4 h-4" />
+            ) : (
+              <NetworkIcon className="w-4 h-4" />
+            )}
+            {isLoading ? "..." : isRunning ? "Stop Network" : "Start Network"}
+          </button>
         </div>
+      </header>
 
-        {error && (
-          <div className="bg-red-100 dark:bg-red-900/50 border border-red-300 dark:border-red-500 rounded-lg p-4 mb-6">
-            <p className="text-red-700 dark:text-red-400">{error}</p>
-          </div>
-        )}
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Error banner */}
+          {error && (
+            <div
+              className="p-4 rounded-xl flex items-center gap-3"
+              style={{
+                background: "hsl(var(--harbor-error) / 0.1)",
+                border: "1px solid hsl(var(--harbor-error) / 0.2)",
+              }}
+            >
+              <XIcon
+                className="w-5 h-5 flex-shrink-0"
+                style={{ color: "hsl(var(--harbor-error))" }}
+              />
+              <p style={{ color: "hsl(var(--harbor-error))" }}>{error}</p>
+            </div>
+          )}
 
-        {/* Stats */}
-        {isRunning && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Connected Peers</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.connectedPeers}</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Uptime</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatUptime(stats.uptimeSeconds)}</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Data In</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatBytes(stats.totalBytesIn)}</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Data Out</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatBytes(stats.totalBytesOut)}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Identity card */}
-        {identity && (
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Your Identity
-            </h3>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm text-gray-500 dark:text-gray-400">
-                  Display Name
-                </label>
-                <p className="text-gray-900 dark:text-white font-medium">
-                  {identity.displayName}
-                </p>
+          {/* Network Status Card */}
+          <div
+            className="rounded-2xl p-6"
+            style={{
+              background: "hsl(var(--harbor-bg-elevated))",
+              border: "1px solid hsl(var(--harbor-border-subtle))",
+            }}
+          >
+            <div className="flex items-start gap-4">
+              {/* Status indicator */}
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{
+                  background:
+                    status === "connected"
+                      ? "hsl(var(--harbor-success) / 0.15)"
+                      : status === "connecting"
+                        ? "hsl(var(--harbor-warning) / 0.15)"
+                        : "hsl(var(--harbor-surface-2))",
+                }}
+              >
+                <NetworkIcon
+                  className="w-7 h-7"
+                  style={{
+                    color:
+                      status === "connected"
+                        ? "hsl(var(--harbor-success))"
+                        : status === "connecting"
+                          ? "hsl(var(--harbor-warning))"
+                          : "hsl(var(--harbor-text-tertiary))",
+                  }}
+                />
               </div>
 
-              {identity.bio && (
-                <div>
-                  <label className="text-sm text-gray-500 dark:text-gray-400">
-                    Bio
-                  </label>
-                  <p className="text-gray-900 dark:text-white">
-                    {identity.bio}
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3
+                    className="text-lg font-semibold"
+                    style={{ color: "hsl(var(--harbor-text-primary))" }}
+                  >
+                    P2P Network
+                  </h3>
+                  <div
+                    className="px-2 py-0.5 rounded-full text-xs font-medium"
+                    style={{
+                      background:
+                        status === "connected"
+                          ? "hsl(var(--harbor-success) / 0.15)"
+                          : status === "connecting"
+                            ? "hsl(var(--harbor-warning) / 0.15)"
+                            : "hsl(var(--harbor-surface-2))",
+                      color:
+                        status === "connected"
+                          ? "hsl(var(--harbor-success))"
+                          : status === "connecting"
+                            ? "hsl(var(--harbor-warning))"
+                            : "hsl(var(--harbor-text-tertiary))",
+                    }}
+                  >
+                    {status === "connected"
+                      ? "Online"
+                      : status === "connecting"
+                        ? "Connecting..."
+                        : "Offline"}
+                  </div>
+                </div>
+                <p
+                  className="text-sm"
+                  style={{ color: "hsl(var(--harbor-text-secondary))" }}
+                >
+                  {isRunning
+                    ? `Connected to ${stats.connectedPeers} peer${stats.connectedPeers !== 1 ? "s" : ""} via libp2p`
+                    : "Start the network to discover and connect with peers"}
+                </p>
+              </div>
+            </div>
+
+            {/* Stats grid */}
+            {isRunning && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+                <div
+                  className="p-3 rounded-xl"
+                  style={{ background: "hsl(var(--harbor-surface-1))" }}
+                >
+                  <p
+                    className="text-xs mb-1"
+                    style={{ color: "hsl(var(--harbor-text-tertiary))" }}
+                  >
+                    Peers
+                  </p>
+                  <p
+                    className="text-xl font-bold"
+                    style={{ color: "hsl(var(--harbor-text-primary))" }}
+                  >
+                    {stats.connectedPeers}
                   </p>
                 </div>
-              )}
+                <div
+                  className="p-3 rounded-xl"
+                  style={{ background: "hsl(var(--harbor-surface-1))" }}
+                >
+                  <p
+                    className="text-xs mb-1"
+                    style={{ color: "hsl(var(--harbor-text-tertiary))" }}
+                  >
+                    Uptime
+                  </p>
+                  <p
+                    className="text-xl font-bold"
+                    style={{ color: "hsl(var(--harbor-text-primary))" }}
+                  >
+                    {formatUptime(stats.uptimeSeconds)}
+                  </p>
+                </div>
+                <div
+                  className="p-3 rounded-xl"
+                  style={{ background: "hsl(var(--harbor-surface-1))" }}
+                >
+                  <p
+                    className="text-xs mb-1"
+                    style={{ color: "hsl(var(--harbor-text-tertiary))" }}
+                  >
+                    Received
+                  </p>
+                  <p
+                    className="text-xl font-bold"
+                    style={{ color: "hsl(var(--harbor-text-primary))" }}
+                  >
+                    {formatBytes(stats.totalBytesIn)}
+                  </p>
+                </div>
+                <div
+                  className="p-3 rounded-xl"
+                  style={{ background: "hsl(var(--harbor-surface-1))" }}
+                >
+                  <p
+                    className="text-xs mb-1"
+                    style={{ color: "hsl(var(--harbor-text-tertiary))" }}
+                  >
+                    Sent
+                  </p>
+                  <p
+                    className="text-xl font-bold"
+                    style={{ color: "hsl(var(--harbor-text-primary))" }}
+                  >
+                    {formatBytes(stats.totalBytesOut)}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
 
-              <div>
-                <label className="text-sm text-gray-500 dark:text-gray-400">
-                  Peer ID
-                </label>
-                <p className="text-xs font-mono text-gray-700 dark:text-gray-300 break-all bg-gray-100 dark:bg-gray-700 p-2 rounded">
-                  {identity.peerId}
-                </p>
+          {/* Identity Card */}
+          {identity && (
+            <div
+              className="rounded-2xl p-6"
+              style={{
+                background: "hsl(var(--harbor-bg-elevated))",
+                border: "1px solid hsl(var(--harbor-border-subtle))",
+              }}
+            >
+              <h3
+                className="text-sm font-medium mb-4"
+                style={{ color: "hsl(var(--harbor-text-secondary))" }}
+              >
+                Your Identity
+              </h3>
+
+              <div className="flex items-center gap-4">
+                <div
+                  className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-semibold text-white flex-shrink-0"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, hsl(var(--harbor-primary)), hsl(var(--harbor-accent)))",
+                  }}
+                >
+                  {identity.avatarHash ? (
+                    <img
+                      src={`/media/${identity.avatarHash}`}
+                      alt=""
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    getInitials(identity.displayName)
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="text-lg font-semibold"
+                    style={{ color: "hsl(var(--harbor-text-primary))" }}
+                  >
+                    {identity.displayName}
+                  </p>
+                  {identity.bio && (
+                    <p
+                      className="text-sm mt-0.5"
+                      style={{ color: "hsl(var(--harbor-text-secondary))" }}
+                    >
+                      {identity.bio}
+                    </p>
+                  )}
+                  <div
+                    className="mt-2 px-3 py-1.5 rounded-lg inline-block font-mono text-xs"
+                    style={{
+                      background: "hsl(var(--harbor-surface-1))",
+                      color: "hsl(var(--harbor-text-tertiary))",
+                    }}
+                  >
+                    {identity.peerId.slice(0, 16)}...{identity.peerId.slice(-12)}
+                  </div>
+                </div>
+
+                <button
+                  className="p-2 rounded-lg transition-colors duration-200"
+                  style={{
+                    color: "hsl(var(--harbor-text-tertiary))",
+                    background: "hsl(var(--harbor-surface-1))",
+                  }}
+                  title="Copy Peer ID"
+                  onClick={() => navigator.clipboard.writeText(identity.peerId)}
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                    />
+                  </svg>
+                </button>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Connected Peers */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            {isRunning ? "Connected Peers" : "Contacts"}
-          </h3>
-
-          {!isRunning ? (
-            <div className="text-center py-8">
-              <div className="text-4xl mb-2">🌐</div>
-              <p className="text-gray-600 dark:text-gray-400">
-                Start the network to discover and connect to peers
-              </p>
-            </div>
-          ) : connectedPeers.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="text-4xl mb-2">📡</div>
-              <p className="text-gray-600 dark:text-gray-400">
-                No peers connected yet. Other devices on your network running this app will appear here.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {connectedPeers.map((peer) => (
-                <div
-                  key={peer.peerId}
-                  className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 flex items-center justify-between"
-                >
-                  <div className="overflow-hidden">
-                    <p className="font-mono text-sm truncate text-gray-900 dark:text-white">
-                      {peer.peerId}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {peer.addresses.length > 0
-                        ? peer.addresses[0]
-                        : "No address"}
-                    </p>
-                  </div>
-                  <div
-                    className={`w-2 h-2 rounded-full flex-shrink-0 ml-2 ${
-                      peer.isConnected ? "bg-green-500" : "bg-gray-400"
-                    }`}
-                  />
-                </div>
-              ))}
-            </div>
           )}
+
+          {/* Peers/Contacts Section */}
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{
+              background: "hsl(var(--harbor-bg-elevated))",
+              border: "1px solid hsl(var(--harbor-border-subtle))",
+            }}
+          >
+            {/* Tabs and Search */}
+            <div
+              className="p-4 border-b flex items-center gap-4"
+              style={{ borderColor: "hsl(var(--harbor-border-subtle))" }}
+            >
+              <div
+                className="flex rounded-lg p-1"
+                style={{ background: "hsl(var(--harbor-surface-1))" }}
+              >
+                <button
+                  onClick={() => setActiveTab("peers")}
+                  className="px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200"
+                  style={{
+                    background:
+                      activeTab === "peers"
+                        ? "hsl(var(--harbor-bg-elevated))"
+                        : "transparent",
+                    color:
+                      activeTab === "peers"
+                        ? "hsl(var(--harbor-text-primary))"
+                        : "hsl(var(--harbor-text-tertiary))",
+                    boxShadow:
+                      activeTab === "peers" ? "var(--shadow-sm)" : "none",
+                  }}
+                >
+                  <UsersIcon className="w-4 h-4 inline mr-1.5" />
+                  Peers
+                </button>
+                <button
+                  onClick={() => setActiveTab("contacts")}
+                  className="px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200"
+                  style={{
+                    background:
+                      activeTab === "contacts"
+                        ? "hsl(var(--harbor-bg-elevated))"
+                        : "transparent",
+                    color:
+                      activeTab === "contacts"
+                        ? "hsl(var(--harbor-text-primary))"
+                        : "hsl(var(--harbor-text-tertiary))",
+                    boxShadow:
+                      activeTab === "contacts" ? "var(--shadow-sm)" : "none",
+                  }}
+                >
+                  <UserIcon className="w-4 h-4 inline mr-1.5" />
+                  Contacts
+                </button>
+              </div>
+
+              <div className="flex-1 relative">
+                <SearchIcon
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+                  style={{ color: "hsl(var(--harbor-text-tertiary))" }}
+                />
+                <input
+                  type="text"
+                  placeholder="Search peers..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 rounded-lg text-sm"
+                  style={{
+                    background: "hsl(var(--harbor-surface-1))",
+                    border: "1px solid hsl(var(--harbor-border-subtle))",
+                    color: "hsl(var(--harbor-text-primary))",
+                  }}
+                />
+              </div>
+
+              <button
+                className="p-2 rounded-lg transition-colors duration-200"
+                style={{
+                  background:
+                    "linear-gradient(135deg, hsl(var(--harbor-primary)), hsl(var(--harbor-accent)))",
+                  color: "white",
+                }}
+                title="Add contact"
+              >
+                <PlusIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Peer list */}
+            <div className="p-4">
+              {!isRunning ? (
+                <div className="text-center py-12">
+                  <div
+                    className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                    style={{ background: "hsl(var(--harbor-surface-1))" }}
+                  >
+                    <NetworkIcon
+                      className="w-8 h-8"
+                      style={{ color: "hsl(var(--harbor-text-tertiary))" }}
+                    />
+                  </div>
+                  <p
+                    className="font-medium mb-1"
+                    style={{ color: "hsl(var(--harbor-text-primary))" }}
+                  >
+                    Network is offline
+                  </p>
+                  <p
+                    className="text-sm"
+                    style={{ color: "hsl(var(--harbor-text-tertiary))" }}
+                  >
+                    Start the network to discover peers on your local network
+                  </p>
+                </div>
+              ) : filteredPeers.length === 0 ? (
+                <div className="text-center py-12">
+                  <div
+                    className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                    style={{ background: "hsl(var(--harbor-surface-1))" }}
+                  >
+                    <UsersIcon
+                      className="w-8 h-8"
+                      style={{ color: "hsl(var(--harbor-text-tertiary))" }}
+                    />
+                  </div>
+                  <p
+                    className="font-medium mb-1"
+                    style={{ color: "hsl(var(--harbor-text-primary))" }}
+                  >
+                    {searchQuery ? "No peers found" : "No peers connected"}
+                  </p>
+                  <p
+                    className="text-sm"
+                    style={{ color: "hsl(var(--harbor-text-tertiary))" }}
+                  >
+                    {searchQuery
+                      ? "Try a different search term"
+                      : "Peers running Harbor on your network will appear here"}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredPeers.map((peer) => (
+                    <div
+                      key={peer.peerId}
+                      className="flex items-center gap-4 p-3 rounded-xl transition-all duration-200"
+                      style={{
+                        background: "hsl(var(--harbor-surface-1))",
+                      }}
+                    >
+                      {/* Avatar */}
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
+                        style={{
+                          background: "hsl(var(--harbor-surface-2))",
+                          color: "hsl(var(--harbor-text-secondary))",
+                        }}
+                      >
+                        {peer.peerId.slice(0, 2).toUpperCase()}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className="font-mono text-sm truncate"
+                          style={{ color: "hsl(var(--harbor-text-primary))" }}
+                        >
+                          {peer.peerId.slice(0, 20)}...
+                        </p>
+                        <p
+                          className="text-xs truncate"
+                          style={{ color: "hsl(var(--harbor-text-tertiary))" }}
+                        >
+                          {peer.addresses.length > 0
+                            ? peer.addresses[0]
+                            : "No address"}
+                        </p>
+                      </div>
+
+                      {/* Status */}
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            peer.isConnected ? "animate-pulse" : ""
+                          }`}
+                          style={{
+                            background: peer.isConnected
+                              ? "hsl(var(--harbor-success))"
+                              : "hsl(var(--harbor-text-tertiary))",
+                          }}
+                        />
+                        <span
+                          className="text-xs"
+                          style={{ color: "hsl(var(--harbor-text-tertiary))" }}
+                        >
+                          {peer.isConnected ? "Connected" : "Disconnected"}
+                        </span>
+                      </div>
+
+                      {/* Actions */}
+                      <button
+                        className="p-2 rounded-lg transition-colors duration-200"
+                        style={{
+                          background: "hsl(var(--harbor-success) / 0.15)",
+                          color: "hsl(var(--harbor-success))",
+                        }}
+                        title="Add to contacts"
+                      >
+                        <CheckIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useIdentityStore } from "./stores";
 import { MainLayout } from "./components/layout";
 import { CreateIdentity, UnlockIdentity } from "./components/onboarding";
+import { HarborIcon } from "./components/icons";
 import {
   ChatPage,
   WallPage,
@@ -13,13 +14,72 @@ import {
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <div
+      className="min-h-screen flex items-center justify-center"
+      style={{
+        background: "linear-gradient(135deg, hsl(220 91% 8%) 0%, hsl(262 60% 12%) 50%, hsl(220 91% 8%) 100%)",
+      }}
+    >
       <div className="text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900 mb-4 animate-pulse">
-          <span className="text-3xl">🔐</span>
+        {/* Animated logo container */}
+        <div className="relative mb-8">
+          {/* Outer glow ring */}
+          <div
+            className="absolute inset-0 rounded-full animate-pulse"
+            style={{
+              background: "radial-gradient(circle, hsl(var(--harbor-primary) / 0.3) 0%, transparent 70%)",
+              transform: "scale(2)",
+            }}
+          />
+          {/* Logo */}
+          <div
+            className="relative w-20 h-20 rounded-2xl flex items-center justify-center mx-auto"
+            style={{
+              background: "linear-gradient(135deg, hsl(var(--harbor-primary)), hsl(var(--harbor-accent)))",
+              boxShadow: "0 8px 32px hsl(var(--harbor-primary) / 0.4)",
+            }}
+          >
+            <HarborIcon className="w-12 h-12 text-white" />
+          </div>
         </div>
-        <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+
+        {/* Loading text */}
+        <h2
+          className="text-xl font-semibold mb-2"
+          style={{ color: "hsl(var(--harbor-text-primary))" }}
+        >
+          Harbor
+        </h2>
+        <p
+          className="text-sm mb-6"
+          style={{ color: "hsl(var(--harbor-text-tertiary))" }}
+        >
+          Initializing secure connection...
+        </p>
+
+        {/* Loading bar */}
+        <div
+          className="w-48 h-1 rounded-full mx-auto overflow-hidden"
+          style={{ background: "hsl(var(--harbor-surface-2))" }}
+        >
+          <div
+            className="h-full rounded-full"
+            style={{
+              background: "linear-gradient(90deg, hsl(var(--harbor-primary)), hsl(var(--harbor-accent)))",
+              animation: "loading-bar 1.5s ease-in-out infinite",
+            }}
+          />
+        </div>
       </div>
+
+      {/* CSS animation for loading bar */}
+      <style>{`
+        @keyframes loading-bar {
+          0% { width: 0%; margin-left: 0%; }
+          50% { width: 60%; margin-left: 20%; }
+          100% { width: 0%; margin-left: 100%; }
+        }
+      `}</style>
     </div>
   );
 }

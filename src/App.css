@@ -1,13 +1,9 @@
 @import "tailwindcss";
+@import "./styles/design-system.css";
 
-/* Base styles */
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+/* ============================================
+   Harbor - Global Styles
+   ============================================ */
 
 /* Prevent text selection during drag operations */
 .select-none {
@@ -19,31 +15,327 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Custom scrollbar for webkit browsers */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* ============================================
+   Typography Helpers
+   ============================================ */
+
+.text-gradient {
+  background: linear-gradient(135deg, hsl(var(--harbor-primary)), hsl(var(--harbor-accent)));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+.text-balance {
+  text-wrap: balance;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
+/* ============================================
+   Layout Helpers
+   ============================================ */
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  ::-webkit-scrollbar-thumb {
-    background: #475569;
-  }
+/* ============================================
+   Interactive States
+   ============================================ */
 
-  ::-webkit-scrollbar-thumb:hover {
-    background: #64748b;
-  }
+.interactive {
+  transition: all var(--transition-fast);
+}
+
+.interactive:hover {
+  transform: translateY(-1px);
+}
+
+.interactive:active {
+  transform: translateY(0);
+}
+
+/* Press effect for buttons */
+.press-effect {
+  transition: transform var(--transition-fast);
+}
+
+.press-effect:active {
+  transform: scale(0.98);
+}
+
+/* ============================================
+   Card Styles
+   ============================================ */
+
+.card {
+  background: hsl(var(--harbor-bg-elevated));
+  border: 1px solid hsl(var(--harbor-border-subtle));
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: hsl(var(--harbor-border));
+}
+
+.card-interactive {
+  cursor: pointer;
+}
+
+.card-interactive:hover {
+  transform: translateY(-2px);
+}
+
+/* ============================================
+   Input Enhancements
+   ============================================ */
+
+input, textarea, select {
+  font-family: inherit;
+}
+
+/* Autofill styles */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: hsl(var(--harbor-text-primary));
+  -webkit-box-shadow: 0 0 0px 1000px hsl(var(--harbor-bg-elevated)) inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* ============================================
+   Badge Styles
+   ============================================ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.badge-primary {
+  background: hsl(var(--harbor-primary) / 0.1);
+  color: hsl(var(--harbor-primary));
+}
+
+.badge-success {
+  background: hsl(var(--harbor-success) / 0.1);
+  color: hsl(var(--harbor-success));
+}
+
+.badge-warning {
+  background: hsl(var(--harbor-warning) / 0.1);
+  color: hsl(var(--harbor-warning));
+}
+
+.badge-error {
+  background: hsl(var(--harbor-error) / 0.1);
+  color: hsl(var(--harbor-error));
+}
+
+/* ============================================
+   Avatar Styles
+   ============================================ */
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, hsl(var(--harbor-primary)), hsl(var(--harbor-accent)));
+  color: white;
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.avatar-sm {
+  width: 32px;
+  height: 32px;
+  font-size: var(--font-size-sm);
+}
+
+.avatar-md {
+  width: 40px;
+  height: 40px;
+  font-size: var(--font-size-base);
+}
+
+.avatar-lg {
+  width: 56px;
+  height: 56px;
+  font-size: var(--font-size-xl);
+}
+
+.avatar-xl {
+  width: 80px;
+  height: 80px;
+  font-size: var(--font-size-2xl);
+}
+
+/* Online indicator */
+.avatar-online::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 25%;
+  height: 25%;
+  min-width: 8px;
+  min-height: 8px;
+  background: hsl(var(--harbor-success));
+  border: 2px solid hsl(var(--harbor-bg-primary));
+  border-radius: var(--radius-full);
+}
+
+/* ============================================
+   Message Bubble Styles
+   ============================================ */
+
+.message-bubble {
+  max-width: 70%;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-xl);
+  word-wrap: break-word;
+}
+
+.message-bubble-sent {
+  background: hsl(var(--harbor-primary));
+  color: white;
+  border-bottom-right-radius: var(--radius-sm);
+  margin-left: auto;
+}
+
+.message-bubble-received {
+  background: hsl(var(--harbor-surface-1));
+  color: hsl(var(--harbor-text-primary));
+  border-bottom-left-radius: var(--radius-sm);
+}
+
+/* ============================================
+   Skeleton Loading
+   ============================================ */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--harbor-surface-1)) 25%,
+    hsl(var(--harbor-surface-2)) 50%,
+    hsl(var(--harbor-surface-1)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-md);
+}
+
+.skeleton-text {
+  height: 1em;
+  margin-bottom: 0.5em;
+}
+
+.skeleton-text:last-child {
+  width: 70%;
+}
+
+.skeleton-avatar {
+  border-radius: var(--radius-full);
+}
+
+/* ============================================
+   Tooltip Styles
+   ============================================ */
+
+.tooltip {
+  position: relative;
+}
+
+.tooltip::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.95);
+  padding: var(--space-2) var(--space-3);
+  background: hsl(var(--harbor-text-primary));
+  color: hsl(var(--harbor-text-inverse));
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: all var(--transition-fast);
+  z-index: var(--z-tooltip);
+}
+
+.tooltip:hover::before {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* ============================================
+   Divider
+   ============================================ */
+
+.divider {
+  height: 1px;
+  background: hsl(var(--harbor-border-subtle));
+  margin: var(--space-4) 0;
+}
+
+.divider-vertical {
+  width: 1px;
+  height: auto;
+  background: hsl(var(--harbor-border-subtle));
+  margin: 0 var(--space-4);
+}
+
+/* ============================================
+   Empty State
+   ============================================ */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-12);
+  text-align: center;
+}
+
+.empty-state-icon {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--harbor-surface-1));
+  border-radius: var(--radius-full);
+  margin-bottom: var(--space-6);
+  font-size: 2rem;
+}
+
+.empty-state-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: hsl(var(--harbor-text-primary));
+  margin-bottom: var(--space-2);
+}
+
+.empty-state-description {
+  font-size: var(--font-size-sm);
+  color: hsl(var(--harbor-text-secondary));
+  max-width: 300px;
 }
