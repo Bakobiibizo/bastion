@@ -7,7 +7,7 @@ pub mod services;
 
 use commands::NetworkState;
 use db::Database;
-use services::{ContactsService, IdentityService, MessagingService, PermissionsService};
+use services::{CallingService, ContactsService, FeedService, IdentityService, MessagingService, PermissionsService, PostsService};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Manager;
@@ -60,6 +60,23 @@ pub fn run() {
                 contacts_service.clone(),
                 permissions_service.clone(),
             ));
+            let posts_service = Arc::new(PostsService::new(
+                db.clone(),
+                identity_service.clone(),
+                contacts_service.clone(),
+                permissions_service.clone(),
+            ));
+            let feed_service = Arc::new(FeedService::new(
+                db.clone(),
+                identity_service.clone(),
+                permissions_service.clone(),
+            ));
+            let calling_service = Arc::new(CallingService::new(
+                db.clone(),
+                identity_service.clone(),
+                contacts_service.clone(),
+                permissions_service.clone(),
+            ));
 
             // Initialize network state (will be populated when identity is unlocked)
             let network_state = NetworkState::new();
@@ -70,6 +87,9 @@ pub fn run() {
             app.manage(contacts_service);
             app.manage(permissions_service);
             app.manage(messaging_service);
+            app.manage(posts_service);
+            app.manage(feed_service);
+            app.manage(calling_service);
             app.manage(network_state);
 
             info!("Application setup complete");
@@ -119,6 +139,27 @@ pub fn run() {
             commands::mark_conversation_read,
             commands::get_unread_count,
             commands::get_total_unread_count,
+            // Post commands
+            commands::create_post,
+            commands::update_post,
+            commands::delete_post,
+            commands::get_post,
+            commands::get_my_posts,
+            commands::get_posts_by_author,
+            commands::add_post_media,
+            commands::get_post_media,
+            // Feed commands
+            commands::get_feed,
+            commands::get_wall,
+            // Calling commands
+            commands::start_call,
+            commands::answer_call,
+            commands::send_ice_candidate,
+            commands::hangup_call,
+            commands::process_offer,
+            commands::process_answer,
+            commands::process_ice_candidate,
+            commands::process_hangup,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

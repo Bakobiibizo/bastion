@@ -1,11 +1,17 @@
+pub mod calling;
 pub mod contacts;
+pub mod feed;
 pub mod identity;
 pub mod messaging;
 pub mod network;
 pub mod permissions;
+pub mod posts;
 
+pub use calling::*;
 pub use contacts::*;
+pub use feed::*;
 pub use identity::*;
 pub use messaging::*;
 pub use network::*;
 pub use permissions::*;
+pub use posts::*;

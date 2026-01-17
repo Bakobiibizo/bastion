@@ -6,4 +6,5 @@ pub use repositories::{
     Contact, ContactData, ContactsRepository,
     Capability, GrantData, Permission, PermissionEvent, PermissionsRepository,
     Conversation, Message, MessageData, MessageStatus, MessagesRepository,
+    Post, PostData, PostMedia, PostMediaData, PostVisibility, PostsRepository,
 };
