@@ -1109,13 +1109,18 @@ export function NetworkPage() {
               </label>
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(RELAY_CLOUDFORMATION_TEMPLATE);
-                      toast.success('CloudFormation template copied to clipboard!');
-                    } catch {
-                      toast.error('Failed to copy template. Open the infrastructure folder to find it.');
-                    }
+                  onClick={() => {
+                    // Create a blob and trigger download
+                    const blob = new Blob([RELAY_CLOUDFORMATION_TEMPLATE], { type: 'application/x-yaml' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'harbor-relay-cloudformation.yaml';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    toast.success('Template downloaded! Now upload it to AWS CloudFormation.');
                   }}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all hover:scale-105"
                   style={{
@@ -1124,9 +1129,9 @@ export function NetworkPage() {
                   }}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  Copy CloudFormation Template
+                  Download Template
                 </button>
                 <a
                   href="https://console.aws.amazon.com/cloudformation/home#/stacks/create/template"
@@ -1145,9 +1150,15 @@ export function NetworkPage() {
                   Open AWS CloudFormation
                 </a>
               </div>
-              <div className="mt-3 text-xs space-y-1" style={{ color: 'hsl(var(--harbor-text-tertiary))' }}>
-                <p><strong>Steps:</strong> 1) Copy template → 2) Open AWS → 3) Select "Template is ready" → "Upload a template file" → Paste & deploy</p>
-                <p>Template location: <code className="font-mono bg-black/20 px-1 rounded">infrastructure/libp2p-relay-cloudformation.yaml</code></p>
+              <div className="mt-3 p-3 rounded-lg" style={{ background: 'hsl(var(--harbor-surface-1))' }}>
+                <p className="text-xs font-medium mb-2" style={{ color: 'hsl(var(--harbor-text-primary))' }}>
+                  Quick Setup (3 steps):
+                </p>
+                <ol className="text-xs space-y-1 list-decimal list-inside" style={{ color: 'hsl(var(--harbor-text-secondary))' }}>
+                  <li>Click <strong>"Download Template"</strong> above</li>
+                  <li>Click <strong>"Open AWS CloudFormation"</strong> → Select <strong>"Upload a template file"</strong> → Choose the downloaded file</li>
+                  <li>Click <strong>Next</strong> through the wizard (defaults are fine) → <strong>Create stack</strong></li>
+                </ol>
               </div>
             </div>
 
