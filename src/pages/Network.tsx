@@ -1099,18 +1099,33 @@ export function NetworkPage() {
               </div>
             </div>
 
-            {/* Deploy to AWS */}
+            {/* Deploy to AWS - Step by Step */}
             <div className="mb-6">
               <label
                 className="text-xs font-medium block mb-3"
                 style={{ color: 'hsl(var(--harbor-text-tertiary))' }}
               >
-                Deploy to AWS (Free Tier - 750 hours/month)
+                Deploy to AWS (Free for 12 months)
               </label>
-              <div className="flex flex-wrap gap-2">
+
+              {/* Step 1: Download */}
+              <div className="mb-4 p-4 rounded-xl" style={{ background: 'hsl(var(--harbor-surface-1))' }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                    style={{
+                      background: 'linear-gradient(135deg, #FF9900, #FF6600)',
+                      color: 'white',
+                    }}
+                  >
+                    1
+                  </span>
+                  <span className="text-sm font-medium" style={{ color: 'hsl(var(--harbor-text-primary))' }}>
+                    Download the template file
+                  </span>
+                </div>
                 <button
                   onClick={() => {
-                    // Create a blob and trigger download
                     const blob = new Blob([RELAY_CLOUDFORMATION_TEMPLATE], { type: 'application/x-yaml' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -1120,7 +1135,7 @@ export function NetworkPage() {
                     a.click();
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
-                    toast.success('Template downloaded! Now upload it to AWS CloudFormation.');
+                    toast.success('Template downloaded! Continue to Step 2.');
                   }}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all hover:scale-105"
                   style={{
@@ -1131,17 +1146,34 @@ export function NetworkPage() {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  Download Template
+                  Download Template File
                 </button>
+              </div>
+
+              {/* Step 2: Open AWS */}
+              <div className="mb-4 p-4 rounded-xl" style={{ background: 'hsl(var(--harbor-surface-1))' }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                    style={{
+                      background: 'linear-gradient(135deg, #FF9900, #FF6600)',
+                      color: 'white',
+                    }}
+                  >
+                    2
+                  </span>
+                  <span className="text-sm font-medium" style={{ color: 'hsl(var(--harbor-text-primary))' }}>
+                    Open AWS and upload the template
+                  </span>
+                </div>
                 <a
                   href="https://console.aws.amazon.com/cloudformation/home#/stacks/create/template"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors mb-3"
                   style={{
-                    background: 'hsl(var(--harbor-surface-1))',
-                    border: '1px solid hsl(var(--harbor-border-subtle))',
-                    color: 'hsl(var(--harbor-text-primary))',
+                    background: 'hsl(var(--harbor-primary))',
+                    color: 'white',
                   }}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1149,16 +1181,76 @@ export function NetworkPage() {
                   </svg>
                   Open AWS CloudFormation
                 </a>
+                <div className="text-xs space-y-1" style={{ color: 'hsl(var(--harbor-text-secondary))' }}>
+                  <p>• Select <strong>"Upload a template file"</strong></p>
+                  <p>• Click <strong>"Choose file"</strong> and select the downloaded file</p>
+                  <p>• Click <strong>"Next"</strong></p>
+                </div>
               </div>
-              <div className="mt-3 p-3 rounded-lg" style={{ background: 'hsl(var(--harbor-surface-1))' }}>
-                <p className="text-xs font-medium mb-2" style={{ color: 'hsl(var(--harbor-text-primary))' }}>
-                  Quick Setup (3 steps):
-                </p>
-                <ol className="text-xs space-y-1 list-decimal list-inside" style={{ color: 'hsl(var(--harbor-text-secondary))' }}>
-                  <li>Click <strong>"Download Template"</strong> above</li>
-                  <li>Click <strong>"Open AWS CloudFormation"</strong> → Select <strong>"Upload a template file"</strong> → Choose the downloaded file</li>
-                  <li>Click <strong>Next</strong> through the wizard (defaults are fine) → <strong>Create stack</strong></li>
-                </ol>
+
+              {/* Step 3: Configure Stack */}
+              <div className="mb-4 p-4 rounded-xl" style={{ background: 'hsl(var(--harbor-surface-1))' }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                    style={{
+                      background: 'linear-gradient(135deg, #FF9900, #FF6600)',
+                      color: 'white',
+                    }}
+                  >
+                    3
+                  </span>
+                  <span className="text-sm font-medium" style={{ color: 'hsl(var(--harbor-text-primary))' }}>
+                    Fill in the settings (easy!)
+                  </span>
+                </div>
+                <div className="text-xs space-y-2" style={{ color: 'hsl(var(--harbor-text-secondary))' }}>
+                  <div className="p-2 rounded" style={{ background: 'hsl(var(--harbor-bg-primary))' }}>
+                    <p><strong>Stack name:</strong> <code className="font-mono px-1 rounded" style={{ background: 'hsl(var(--harbor-surface-2))' }}>harbor-relay</code></p>
+                    <p className="text-xs opacity-75 mt-1">This is just a label to identify your server in AWS</p>
+                  </div>
+                  <div className="p-2 rounded" style={{ background: 'hsl(var(--harbor-bg-primary))' }}>
+                    <p><strong>InstanceType:</strong> Leave as <code className="font-mono px-1 rounded" style={{ background: 'hsl(var(--harbor-surface-2))' }}>t2.micro</code> (free!)</p>
+                  </div>
+                  <div className="p-2 rounded" style={{ background: 'hsl(var(--harbor-bg-primary))' }}>
+                    <p><strong>KeyPairName:</strong> <span className="font-medium" style={{ color: 'hsl(var(--harbor-success))' }}>Leave empty</span></p>
+                    <p className="text-xs opacity-75 mt-1">You don't need SSH access - we'll use AWS's built-in browser terminal</p>
+                  </div>
+                  <div className="p-2 rounded" style={{ background: 'hsl(var(--harbor-bg-primary))' }}>
+                    <p><strong>All other settings:</strong> Leave as default</p>
+                  </div>
+                  <p className="pt-2">Click <strong>"Next"</strong> to continue</p>
+                </div>
+              </div>
+
+              {/* Step 4: Review and Create */}
+              <div className="mb-4 p-4 rounded-xl" style={{ background: 'hsl(var(--harbor-surface-1))' }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                    style={{
+                      background: 'linear-gradient(135deg, #FF9900, #FF6600)',
+                      color: 'white',
+                    }}
+                  >
+                    4
+                  </span>
+                  <span className="text-sm font-medium" style={{ color: 'hsl(var(--harbor-text-primary))' }}>
+                    Review and create
+                  </span>
+                </div>
+                <div className="text-xs space-y-2" style={{ color: 'hsl(var(--harbor-text-secondary))' }}>
+                  <p>• On the "Configure stack options" page: just click <strong>"Next"</strong></p>
+                  <p>• On the "Review" page: scroll to the bottom</p>
+                  <div className="p-2 rounded flex items-start gap-2" style={{ background: 'hsl(var(--harbor-warning) / 0.1)' }}>
+                    <input type="checkbox" disabled className="mt-0.5" />
+                    <p><strong>Check the box</strong> that says "I acknowledge that AWS CloudFormation might create IAM resources with custom names"</p>
+                  </div>
+                  <p>• Click <strong>"Submit"</strong> or <strong>"Create stack"</strong></p>
+                  <p className="pt-2" style={{ color: 'hsl(var(--harbor-success))' }}>
+                    <strong>Wait 3-5 minutes</strong> for the server to start up. You'll see "CREATE_COMPLETE" when ready!
+                  </p>
+                </div>
               </div>
             </div>
 
