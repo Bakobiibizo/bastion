@@ -170,12 +170,27 @@ function AppContent() {
   // Auto-start network when identity is unlocked (if enabled in settings)
   useEffect(() => {
     if (state.status === "unlocked") {
-      checkStatus().then(() => {
+      checkStatus().then(async () => {
         // Only auto-start if setting is enabled and network isn't already running
         const networkState = useNetworkStore.getState();
         if (autoStartNetwork && !networkState.isRunning) {
           console.log("[Harbor] Auto-starting network...");
-          startNetwork();
+          await startNetwork();
+
+          // Connect to saved bootstrap nodes
+          const settingsState = useSettingsStore.getState();
+          if (settingsState.bootstrapNodes.length > 0) {
+            console.log("[Harbor] Connecting to saved bootstrap nodes...");
+            const { addBootstrapNode } = useNetworkStore.getState();
+            for (const node of settingsState.bootstrapNodes) {
+              try {
+                await addBootstrapNode(node);
+                console.log(`[Harbor] Connected to bootstrap node: ${node}`);
+              } catch (error) {
+                console.error(`[Harbor] Failed to connect to bootstrap node: ${node}`, error);
+              }
+            }
+          }
         }
       });
     }

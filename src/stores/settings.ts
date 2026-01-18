@@ -5,6 +5,7 @@ interface SettingsState {
   // Network settings
   autoStartNetwork: boolean;
   localDiscovery: boolean;
+  bootstrapNodes: string[];
 
   // Privacy settings
   showReadReceipts: boolean;
@@ -17,6 +18,8 @@ interface SettingsState {
   // Actions
   setAutoStartNetwork: (value: boolean) => void;
   setLocalDiscovery: (value: boolean) => void;
+  addBootstrapNode: (address: string) => void;
+  removeBootstrapNode: (address: string) => void;
   setShowReadReceipts: (value: boolean) => void;
   setShowOnlineStatus: (value: boolean) => void;
   setDefaultVisibility: (value: "contacts" | "public") => void;
@@ -29,6 +32,7 @@ export const useSettingsStore = create<SettingsState>()(
       // Initial values
       autoStartNetwork: true,
       localDiscovery: true,
+      bootstrapNodes: [],
       showReadReceipts: true,
       showOnlineStatus: true,
       defaultVisibility: "contacts",
@@ -37,6 +41,16 @@ export const useSettingsStore = create<SettingsState>()(
       // Actions
       setAutoStartNetwork: (value) => set({ autoStartNetwork: value }),
       setLocalDiscovery: (value) => set({ localDiscovery: value }),
+      addBootstrapNode: (address) =>
+        set((state) => ({
+          bootstrapNodes: state.bootstrapNodes.includes(address)
+            ? state.bootstrapNodes
+            : [...state.bootstrapNodes, address],
+        })),
+      removeBootstrapNode: (address) =>
+        set((state) => ({
+          bootstrapNodes: state.bootstrapNodes.filter((a) => a !== address),
+        })),
       setShowReadReceipts: (value) => set({ showReadReceipts: value }),
       setShowOnlineStatus: (value) => set({ showOnlineStatus: value }),
       setDefaultVisibility: (value) => set({ defaultVisibility: value }),
