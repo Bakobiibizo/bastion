@@ -49,7 +49,7 @@ base64 = "0.22"
 hex = "0.4"
 
 # P2P Networking
-libp2p = { version = "0.54", features = [
+libp2p = { version = "0.56", features = [
     "tokio",
     "tcp",
     "quic",
@@ -69,3 +69,4 @@ libp2p = { version = "0.54", features = [
 ] }
 multiaddr = "0.18"
 void = "1"
+

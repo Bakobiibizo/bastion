@@ -373,7 +373,7 @@ impl NetworkService {
                 }
             }
 
-            ChatBehaviourEvent::IdentityExchange(request_response::Event::Message { peer, message }) => {
+            ChatBehaviourEvent::IdentityExchange(request_response::Event::Message { peer, message, .. }) => {
                 match message {
                     request_response::Message::Request { request_id, request, channel } => {
                         info!("Received identity request from {}", peer);
@@ -386,7 +386,7 @@ impl NetworkService {
                 }
             }
 
-            ChatBehaviourEvent::Messaging(request_response::Event::Message { peer, message }) => {
+            ChatBehaviourEvent::Messaging(request_response::Event::Message { peer, message, .. }) => {
                 match message {
                     request_response::Message::Request { request_id, request, channel } => {
                         debug!("Received message request from {}", peer);

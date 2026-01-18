@@ -14,7 +14,7 @@ tokio = { version = "1", features = ["full"] }
 futures = "0.3"
 
 # libp2p with same features as Harbor
-libp2p = { version = "0.54", features = [
+libp2p = { version = "0.56", features = [
     "tokio",
     "tcp",
     "noise",

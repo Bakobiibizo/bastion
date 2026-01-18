@@ -243,7 +243,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             SwarmEvent::Behaviour(MockPeerBehaviourEvent::IdentityExchange(event)) => {
                 match event {
-                    request_response::Event::Message { peer, message } => {
+                    request_response::Event::Message { peer, message, .. } => {
                         match message {
                             request_response::Message::Request { request, channel, .. } => {
                                 info!("Identity request from {}: {:?}", peer, request.requester_peer_id);
@@ -275,7 +275,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             SwarmEvent::Behaviour(MockPeerBehaviourEvent::Messaging(event)) => {
                 match event {
-                    request_response::Event::Message { peer, message } => {
+                    request_response::Event::Message { peer, message, .. } => {
                         match message {
                             request_response::Message::Request { request, channel, .. } => {
                                 info!(
