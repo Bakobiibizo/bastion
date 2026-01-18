@@ -133,13 +133,13 @@ export function WallPage() {
             className="text-2xl font-bold"
             style={{ color: "hsl(var(--harbor-text-primary))" }}
           >
-            Journal
+            Wall
           </h1>
           <p
             className="text-sm mt-1"
             style={{ color: "hsl(var(--harbor-text-secondary))" }}
           >
-            Share your thoughts and creations
+            Your personal space for thoughts and creations
           </p>
         </div>
       </header>

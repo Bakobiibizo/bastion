@@ -1,7 +1,7 @@
 import { useEffect, Component, type ReactNode } from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import { useIdentityStore } from "./stores";
+import { useIdentityStore, useNetworkStore } from "./stores";
 import { useTauriEvents } from "./hooks";
 import { MainLayout } from "./components/layout";
 import { CreateIdentity, UnlockIdentity } from "./components/onboarding";
@@ -157,6 +157,7 @@ function LoadingScreen() {
 
 function AppContent() {
   const { state, initialize } = useIdentityStore();
+  const { checkStatus } = useNetworkStore();
 
   // Set up Tauri event listeners for real-time updates from backend
   useTauriEvents();
@@ -164,6 +165,13 @@ function AppContent() {
   useEffect(() => {
     initialize();
   }, [initialize]);
+
+  // Check network status when identity is unlocked
+  useEffect(() => {
+    if (state.status === "unlocked") {
+      checkStatus();
+    }
+  }, [state.status, checkStatus]);
 
   // Loading state
   if (state.status === "loading") {

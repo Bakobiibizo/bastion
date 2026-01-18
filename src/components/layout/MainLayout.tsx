@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { useIdentityStore, useSettingsStore } from "../../stores";
+import { useIdentityStore, useSettingsStore, useNetworkStore } from "../../stores";
 import {
   ChatIcon,
   WallIcon,
@@ -53,11 +53,35 @@ const navItems: NavItem[] = [
 export function MainLayout({ children }: MainLayoutProps) {
   const { state, lock } = useIdentityStore();
   const { showOnlineStatus, avatarUrl } = useSettingsStore();
+  const { isRunning, status, stats } = useNetworkStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [isLocking, setIsLocking] = useState(false);
 
   const identity = state.status === "unlocked" ? state.identity : null;
+
+  // Get indicator color based on network status
+  const getStatusColor = () => {
+    if (!isRunning) return "hsl(var(--harbor-text-tertiary))"; // Gray when offline
+    if (status === "connecting") return "hsl(var(--harbor-warning))"; // Yellow when connecting
+    return "hsl(var(--harbor-success))"; // Green when connected
+  };
+
+  // Get status text based on network status
+  const getStatusText = () => {
+    if (!isRunning) return "Network offline";
+    if (status === "connecting") return "Connecting...";
+    if (stats.connectedPeers > 0) return `${stats.connectedPeers} peer${stats.connectedPeers !== 1 ? "s" : ""} connected`;
+    return "No peers found";
+  };
+
+  // Get user indicator color (combines network status + user preference)
+  const getUserIndicatorColor = () => {
+    if (!isRunning) return "hsl(var(--harbor-text-tertiary))"; // Gray when network offline
+    if (status === "connecting") return "hsl(var(--harbor-warning))"; // Yellow when connecting
+    if (!showOnlineStatus) return "hsl(var(--harbor-text-tertiary))"; // Gray when user wants to appear offline
+    return "hsl(var(--harbor-success))"; // Green when online and visible
+  };
 
   const handleLock = async () => {
     setIsLocking(true);
@@ -157,16 +181,25 @@ export function MainLayout({ children }: MainLayoutProps) {
                       getInitials(identity.displayName)
                     )}
                   </div>
-                  {/* Online indicator - only shows if setting is enabled */}
-                  {showOnlineStatus && (
-                    <div
-                      className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2"
-                      style={{
-                        background: "hsl(var(--harbor-success))",
-                        borderColor: "hsl(var(--harbor-bg-elevated))",
-                      }}
-                    />
-                  )}
+                  {/* Online indicator - reflects actual network status and user preference */}
+                  <div
+                    className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 ${
+                      isRunning && status === "connected" ? "animate-pulse" : ""
+                    }`}
+                    style={{
+                      background: getUserIndicatorColor(),
+                      borderColor: "hsl(var(--harbor-bg-elevated))",
+                    }}
+                    title={
+                      !isRunning
+                        ? "Offline - Network not running"
+                        : status === "connecting"
+                          ? "Connecting..."
+                          : !showOnlineStatus
+                            ? "Appearing offline"
+                            : "Online"
+                    }
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p
@@ -335,14 +368,16 @@ export function MainLayout({ children }: MainLayoutProps) {
         >
           <div className="flex items-center gap-2">
             <div
-              className="w-2 h-2 rounded-full animate-pulse"
-              style={{ background: "hsl(var(--harbor-success))" }}
+              className={`w-2 h-2 rounded-full ${
+                isRunning && status === "connected" ? "animate-pulse" : ""
+              }`}
+              style={{ background: getStatusColor() }}
             />
             <span
               className="text-xs"
               style={{ color: "hsl(var(--harbor-text-tertiary))" }}
             >
-              Connected to network
+              {getStatusText()}
             </span>
           </div>
         </div>
