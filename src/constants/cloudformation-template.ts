@@ -174,7 +174,18 @@ Resources:
         - Key: Name
           Value: harbor-relay-sg
 
-  # IAM Role for EC2 (for SSM access)
+  # SSM Parameter to store the relay address (so users can easily find it)
+  RelayAddressParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /harbor/relay-address
+      Type: String
+      Value: "Starting up... check back in 5 minutes"
+      Description: "Full relay address for Harbor - copy this into the app"
+      Tags:
+        Application: harbor-chat
+
+  # IAM Role for EC2 (for SSM access + parameter store write)
   RelayInstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -188,6 +199,15 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: WriteRelayAddress
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:PutParameter
+                Resource: !Sub "arn:aws:ssm:\${AWS::Region}:\${AWS::AccountId}:parameter/harbor/relay-address"
       Tags:
         - Key: Name
           Value: harbor-relay-role
@@ -344,12 +364,26 @@ Resources:
           sleep 15
           /opt/relay/get-peer-id.sh
 
+          # Get the full relay address
+          RELAY_ADDRESS=$(/opt/relay/get-relay-address.sh)
+
+          # Write the relay address to SSM Parameter Store so users can easily find it
+          aws ssm put-parameter \
+            --name "/harbor/relay-address" \
+            --value "$RELAY_ADDRESS" \
+            --type String \
+            --overwrite \
+            --region \${AWS::Region}
+
           # Log startup complete with the full relay address
           echo "Harbor libp2p relay server started on port \${RelayPort}"
           echo "=============================================="
           echo "YOUR RELAY ADDRESS (copy this to Harbor):"
-          /opt/relay/get-relay-address.sh
+          echo "$RELAY_ADDRESS"
           echo "=============================================="
+          echo ""
+          echo "This address has been saved to AWS Parameter Store."
+          echo "Find it at: AWS Console > Systems Manager > Parameter Store > /harbor/relay-address"
 
       Tags:
         - Key: Name
@@ -358,38 +392,23 @@ Resources:
           Value: harbor-chat
 
 Outputs:
+  Step1WaitFiveMinutes:
+    Description: "STEP 1: Wait 5 minutes for the server to start up"
+    Value: "The relay server needs about 5 minutes to fully start. Grab a coffee!"
+
+  Step2GetYourRelayAddress:
+    Description: "STEP 2: Click this link to get your relay address"
+    Value: !Sub "https://\${AWS::Region}.console.aws.amazon.com/systems-manager/parameters/harbor/relay-address/description?region=\${AWS::Region}"
+
+  Step3CopyTheValue:
+    Description: "STEP 3: Copy the 'Value' field and paste it into Harbor"
+    Value: "On that page, find the 'Value' field. It looks like: /ip4/1.2.3.4/tcp/4001/p2p/12D3KooW..."
+
   RelayPublicIP:
-    Description: "Public IP address of the relay server"
+    Description: "Public IP address (for reference)"
     Value: !Ref RelayEIP
-    Export:
-      Name: HarborRelayPublicIP
-
-  RelayMultiaddrTemplate:
-    Description: "Multiaddress template - run get-relay-address.sh on server to get the full address"
-    Value: !Sub "/ip4/\${RelayEIP}/tcp/\${RelayPort}/p2p/<PEER_ID>"
-
-  GetFullRelayAddress:
-    Description: "Run this command on the server (via SSM) to get the complete relay address"
-    Value: "/opt/relay/get-relay-address.sh"
-
-  SSHCommand:
-    Condition: HasKeyPair
-    Description: "SSH command to connect to the relay server"
-    Value: !Sub "ssh -i \${KeyPairName}.pem ec2-user@\${RelayEIP}"
-
-  SSMConnectCommand:
-    Description: "AWS CLI command to connect via Session Manager (no SSH key needed)"
-    Value: !Sub "aws ssm start-session --target \${RelayInstance}"
-
-  RelayInstanceId:
-    Description: "EC2 Instance ID (use with SSM Session Manager for shell access)"
-    Value: !Ref RelayInstance
-
-  QuickStartInstructions:
-    Description: "Quick start: Connect via SSM, then run /opt/relay/get-relay-address.sh to get the address to paste into Harbor"
-    Value: "1) Go to EC2 Console 2) Select harbor-relay-server 3) Click Connect > Session Manager 4) Run: /opt/relay/get-relay-address.sh 5) Copy the output to Harbor"
 
   EstimatedMonthlyCost:
-    Description: "Estimated monthly cost (free tier: $0 for first 12 months, then ~$8-10/month)"
-    Value: "Free tier eligible for 750 hours/month. After free tier: ~$8-10/month for t2.micro"
+    Description: "Cost: FREE for 12 months, then ~$9/month"
+    Value: "AWS Free Tier: 750 hours/month for first year"
 `;

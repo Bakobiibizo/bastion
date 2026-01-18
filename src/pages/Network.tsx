@@ -1254,107 +1254,42 @@ export function NetworkPage() {
               </div>
             </div>
 
-            {/* Instructions */}
-            <div
-              className="p-4 rounded-xl mb-6"
-              style={{ background: 'hsl(var(--harbor-surface-1))' }}
-            >
-              <h4
-                className="text-sm font-semibold mb-3"
-                style={{ color: 'hsl(var(--harbor-text-primary))' }}
-              >
-                After Deployment - Get Your Relay's Peer ID
-              </h4>
-              <ol
-                className="text-xs space-y-2"
-                style={{ color: 'hsl(var(--harbor-text-secondary))' }}
-              >
-                <li className="flex gap-2">
-                  <span
-                    className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
-                    style={{
-                      background: 'hsl(var(--harbor-primary) / 0.2)',
-                      color: 'hsl(var(--harbor-primary))',
-                    }}
-                  >
-                    1
-                  </span>
-                  <span>
-                    Go to{' '}
-                    <a
-                      href="https://console.aws.amazon.com/ec2/v2/home#Instances"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline"
-                      style={{ color: 'hsl(var(--harbor-primary))' }}
-                    >
-                      AWS EC2 Console
-                    </a>{' '}
-                    and find your "harbor-relay-server" instance
-                  </span>
-                </li>
-                <li className="flex gap-2">
-                  <span
-                    className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
-                    style={{
-                      background: 'hsl(var(--harbor-primary) / 0.2)',
-                      color: 'hsl(var(--harbor-primary))',
-                    }}
-                  >
-                    2
-                  </span>
-                  <span>Click "Connect" → "Session Manager" → "Connect"</span>
-                </li>
-                <li className="flex gap-2">
-                  <span
-                    className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
-                    style={{
-                      background: 'hsl(var(--harbor-primary) / 0.2)',
-                      color: 'hsl(var(--harbor-primary))',
-                    }}
-                  >
-                    3
-                  </span>
-                  <span>
-                    Run:{' '}
-                    <code
-                      className="px-1.5 py-0.5 rounded font-mono"
-                      style={{ background: 'hsl(var(--harbor-bg-primary))' }}
-                    >
-                      /opt/relay/get-relay-address.sh
-                    </code>
-                  </span>
-                </li>
-                <li className="flex gap-2">
-                  <span
-                    className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
-                    style={{
-                      background: 'hsl(var(--harbor-primary) / 0.2)',
-                      color: 'hsl(var(--harbor-primary))',
-                    }}
-                  >
-                    4
-                  </span>
-                  <span>
-                    Copy the full address (looks like{' '}
-                    <code className="font-mono">/ip4/1.2.3.4/tcp/4001/p2p/12D3KooW...</code>)
-                  </span>
-                </li>
-                <li className="flex gap-2">
-                  <span
-                    className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
-                    style={{
-                      background: 'hsl(var(--harbor-primary) / 0.2)',
-                      color: 'hsl(var(--harbor-primary))',
-                    }}
-                  >
-                    5
-                  </span>
-                  <span>
-                    Paste it in the "Add Your Custom Relay" field below and click "Add Relay"
-                  </span>
-                </li>
-              </ol>
+            {/* Step 5: Get Your Relay Address (after deployment) */}
+            <div className="mb-4 p-4 rounded-xl" style={{ background: 'hsl(var(--harbor-success) / 0.1)', border: '1px solid hsl(var(--harbor-success) / 0.2)' }}>
+              <div className="flex items-center gap-3 mb-3">
+                <span
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                  style={{
+                    background: 'hsl(var(--harbor-success))',
+                    color: 'white',
+                  }}
+                >
+                  5
+                </span>
+                <span className="text-sm font-medium" style={{ color: 'hsl(var(--harbor-success))' }}>
+                  Get your relay address (after 5 minutes)
+                </span>
+              </div>
+              <div className="text-xs space-y-2" style={{ color: 'hsl(var(--harbor-text-secondary))' }}>
+                <p>After deployment completes, your relay address is automatically saved. To get it:</p>
+                <a
+                  href="https://console.aws.amazon.com/systems-manager/parameters/harbor/relay-address/description"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  style={{
+                    background: 'hsl(var(--harbor-success))',
+                    color: 'white',
+                  }}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  Open Relay Address Page
+                </a>
+                <p className="pt-2">Copy the <strong>"Value"</strong> field (looks like <code className="font-mono">/ip4/1.2.3.4/tcp/4001/p2p/12D3KooW...</code>)</p>
+                <p>Then paste it below and click <strong>"Add Relay"</strong></p>
+              </div>
             </div>
 
             {/* Add Custom Relay */}
