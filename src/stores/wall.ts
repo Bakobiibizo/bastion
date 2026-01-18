@@ -49,7 +49,7 @@ function toWallPost(post: Post, media?: PostMedia[]): WallPost {
   };
 }
 
-export const useWallStore = create<WallState>((set, get) => ({
+export const useWallStore = create<WallState>((set) => ({
   posts: [],
   isLoading: false,
   error: null,
