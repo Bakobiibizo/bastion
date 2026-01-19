@@ -203,6 +203,8 @@ pub fn run() {
             // Feed commands
             commands::get_feed,
             commands::get_wall,
+            commands::get_wall_preview,
+            commands::get_wall_visibility_stats,
             // Calling commands
             commands::start_call,
             commands::answer_call,
