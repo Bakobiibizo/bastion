@@ -164,6 +164,7 @@ pub fn run() {
             commands::get_listening_addresses,
             commands::connect_to_peer,
             commands::add_bootstrap_node,
+            commands::get_shareable_addresses,
             // Bootstrap configuration commands
             commands::get_bootstrap_nodes,
             commands::add_bootstrap_node_config,
