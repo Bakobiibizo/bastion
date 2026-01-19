@@ -1,3 +1,4 @@
+pub mod bootstrap;
 pub mod calling;
 pub mod contacts;
 pub mod feed;
@@ -7,6 +8,7 @@ pub mod network;
 pub mod permissions;
 pub mod posts;
 
+pub use bootstrap::*;
 pub use calling::*;
 pub use contacts::*;
 pub use feed::*;
