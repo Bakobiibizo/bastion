@@ -8,8 +8,8 @@ pub mod services;
 use commands::NetworkState;
 use db::Database;
 use services::{
-    CallingService, ContactsService, FeedService, IdentityService, MessagingService,
-    PermissionsService, PostsService,
+    CallingService, ContactsService, ContentSyncService, FeedService, IdentityService,
+    MessagingService, PermissionsService, PostsService,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -114,6 +114,12 @@ pub fn run() {
                 contacts_service.clone(),
                 permissions_service.clone(),
             ));
+            let content_sync_service = Arc::new(ContentSyncService::new(
+                db.clone(),
+                identity_service.clone(),
+                contacts_service.clone(),
+                permissions_service.clone(),
+            ));
             let feed_service = Arc::new(FeedService::new(
                 db.clone(),
                 identity_service.clone(),
@@ -136,6 +142,7 @@ pub fn run() {
             app.manage(permissions_service);
             app.manage(messaging_service);
             app.manage(posts_service);
+            app.manage(content_sync_service);
             app.manage(feed_service);
             app.manage(calling_service);
             app.manage(network_state);
@@ -163,6 +170,7 @@ pub fn run() {
             commands::stop_network,
             commands::get_listening_addresses,
             commands::connect_to_peer,
+            commands::sync_feed,
             commands::add_bootstrap_node,
             // Contact commands
             commands::get_contacts,

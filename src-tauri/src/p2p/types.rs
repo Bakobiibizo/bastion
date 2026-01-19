@@ -118,6 +118,8 @@ pub enum NetworkCommand {
     AddBootstrapNode { address: Multiaddr },
     /// Bootstrap the DHT
     Bootstrap,
+    /// Sync feed content from connected peers
+    SyncFeed { limit: u32 },
     /// Shutdown the network
     Shutdown,
 }
