@@ -14,6 +14,7 @@ pub enum MessageStatus {
 }
 
 impl MessageStatus {
+    #[allow(clippy::should_implement_trait)]
     pub fn as_str(&self) -> &'static str {
         match self {
             MessageStatus::Pending => "pending",
@@ -24,6 +25,7 @@ impl MessageStatus {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "pending" => Some(MessageStatus::Pending),
@@ -368,6 +370,7 @@ impl MessagesRepository {
     }
 
     /// Record a message event (for event sourcing)
+    #[allow(clippy::too_many_arguments)]
     pub fn record_message_event(
         db: &Database,
         event_id: &str,
