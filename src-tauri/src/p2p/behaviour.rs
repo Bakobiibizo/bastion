@@ -4,6 +4,7 @@ use libp2p::{
     swarm::NetworkBehaviour,
     StreamProtocol,
 };
+use std::collections::HashMap;
 use std::time::Duration;
 
 use super::protocols::{CONTENT_SYNC_PROTOCOL, IDENTITY_PROTOCOL, MESSAGING_PROTOCOL};
@@ -72,14 +73,26 @@ pub struct MessagingResponse {
     pub error: Option<String>,
 }
 
-/// Content sync request
+/// Post summary for content sync manifest
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PostSummaryProto {
+    pub post_id: String,
+    pub author_peer_id: String,
+    pub lamport_clock: u64,
+    pub content_type: String,
+    pub has_media: bool,
+    pub media_hashes: Vec<String>,
+    pub created_at: i64,
+}
+
+/// Content sync request (wire protocol)
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentSyncRequest {
     /// Request a manifest of posts newer than the provided cursor
     Manifest {
         requester_peer_id: String,
-        cursor: std::collections::HashMap<String, u64>,
+        cursor: HashMap<String, u64>,
         limit: u32,
         timestamp: i64,
         signature: Vec<u8>,
@@ -94,18 +107,20 @@ pub enum ContentSyncRequest {
     },
 }
 
-/// Content sync response
+/// Content sync response (wire protocol)
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentSyncResponse {
+    /// Response with manifest of posts
     Manifest {
         responder_peer_id: String,
-        posts: Vec<crate::services::PostSummary>,
+        posts: Vec<PostSummaryProto>,
         has_more: bool,
-        next_cursor: std::collections::HashMap<String, u64>,
+        next_cursor: HashMap<String, u64>,
         timestamp: i64,
         signature: Vec<u8>,
     },
+    /// Response with full post content
     Post {
         post_id: String,
         author_peer_id: String,
@@ -116,9 +131,8 @@ pub enum ContentSyncResponse {
         created_at: i64,
         signature: Vec<u8>,
     },
-    Error {
-        error: String,
-    },
+    /// Error response
+    Error { error: String },
 }
 
 impl ChatBehaviour {

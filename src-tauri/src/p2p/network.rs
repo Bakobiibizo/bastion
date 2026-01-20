@@ -14,15 +14,28 @@ use tracing::{debug, error, info, warn};
 /// Public relay servers that support libp2p relay v2
 /// These are IPFS bootstrap nodes that run relay servers
 const PUBLIC_RELAYS: &[&str] = &[
+    // IPFS/libp2p bootstrap nodes - globally distributed
     "/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
     "/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa",
     "/dnsaddr/bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb",
     "/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt",
+    // Additional IPFS bootstrap nodes with direct addresses for better connectivity
+    "/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ",
+    "/ip4/104.131.131.82/udp/4001/quic-v1/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ",
+];
+
+/// Public relay servers specifically for relay circuits (if available)
+/// These can be used as fallback when the bootstrap nodes don't provide relay service
+#[allow(dead_code)]
+const FALLBACK_RELAYS: &[&str] = &[
+    // Placeholder for future Harbor-specific relay servers
+    // Users can deploy their own using the AWS CloudFormation template
 ];
 
 use super::behaviour::{
     ChatBehaviour, ChatBehaviourEvent, ContentSyncRequest, ContentSyncResponse,
     IdentityExchangeRequest, IdentityExchangeResponse, MessagingRequest, MessagingResponse,
+    PostSummaryProto,
 };
 use super::config::NetworkConfig;
 use super::protocols::messaging::{MessagingCodec, MessagingMessage};
@@ -174,6 +187,90 @@ impl NetworkHandle {
         let (tx, rx) = oneshot::channel();
         self.command_tx
             .send((NetworkCommand::AddBootstrapNode { address }, Some(tx)))
+            .await
+            .map_err(|_| AppError::Internal("Network service unavailable".into()))?;
+
+        match rx.await {
+            Ok(NetworkResponse::Ok) => Ok(()),
+            Ok(NetworkResponse::Error(e)) => Err(AppError::Network(e)),
+            _ => Err(AppError::Internal("Unexpected response".into())),
+        }
+    }
+
+    /// Add a custom relay server and attempt to get a relay reservation
+    pub async fn add_relay_server(&self, address: Multiaddr) -> Result<()> {
+        let (tx, rx) = oneshot::channel();
+        self.command_tx
+            .send((NetworkCommand::AddRelayServer { address }, Some(tx)))
+            .await
+            .map_err(|_| AppError::Internal("Network service unavailable".into()))?;
+
+        match rx.await {
+            Ok(NetworkResponse::Ok) => Ok(()),
+            Ok(NetworkResponse::Error(e)) => Err(AppError::Network(e)),
+            _ => Err(AppError::Internal("Unexpected response".into())),
+        }
+    }
+
+    /// Request content manifest from a peer
+    pub async fn request_content_manifest(
+        &self,
+        peer_id: PeerId,
+        cursor: std::collections::HashMap<String, u64>,
+        limit: u32,
+    ) -> Result<()> {
+        let (tx, rx) = oneshot::channel();
+        self.command_tx
+            .send((
+                NetworkCommand::RequestContentManifest {
+                    peer_id,
+                    cursor,
+                    limit,
+                },
+                Some(tx),
+            ))
+            .await
+            .map_err(|_| AppError::Internal("Network service unavailable".into()))?;
+
+        match rx.await {
+            Ok(NetworkResponse::Ok) => Ok(()),
+            Ok(NetworkResponse::Error(e)) => Err(AppError::Network(e)),
+            _ => Err(AppError::Internal("Unexpected response".into())),
+        }
+    }
+
+    /// Connect to public relay servers for NAT traversal
+    pub async fn connect_to_public_relays(&self) -> Result<()> {
+        let (tx, rx) = oneshot::channel();
+        self.command_tx
+            .send((NetworkCommand::ConnectToPublicRelays, Some(tx)))
+            .await
+            .map_err(|_| AppError::Internal("Network service unavailable".into()))?;
+
+        match rx.await {
+            Ok(NetworkResponse::Ok) => Ok(()),
+            Ok(NetworkResponse::Error(e)) => Err(AppError::Network(e)),
+            _ => Err(AppError::Internal("Unexpected response".into())),
+        }
+    }
+
+    /// Request content fetch from a peer
+    pub async fn request_content_fetch(
+        &self,
+        peer_id: PeerId,
+        post_id: String,
+        include_media: bool,
+    ) -> Result<()> {
+        let (tx, rx) = oneshot::channel();
+        self.command_tx
+            .send((
+                NetworkCommand::RequestContentFetch {
+                    peer_id,
+                    post_id,
+                    include_media,
+                },
+                Some(tx),
+            ))
             .await
             .map_err(|_| AppError::Internal("Network service unavailable".into()))?;
 
@@ -481,7 +578,19 @@ impl NetworkService {
                     Ok(resp) => {
                         let response = ContentSyncResponse::Manifest {
                             responder_peer_id: resp.responder_peer_id,
-                            posts: resp.posts,
+                            posts: resp
+                                .posts
+                                .into_iter()
+                                .map(|p| PostSummaryProto {
+                                    post_id: p.post_id,
+                                    author_peer_id: p.author_peer_id,
+                                    lamport_clock: p.lamport_clock,
+                                    content_type: p.content_type,
+                                    has_media: p.has_media,
+                                    media_hashes: p.media_hashes,
+                                    created_at: p.created_at,
+                                })
+                                .collect(),
                             has_more: resp.has_more,
                             next_cursor: resp.next_cursor,
                             timestamp: resp.timestamp,
@@ -602,9 +711,23 @@ impl NetworkService {
                     return;
                 }
 
+                // Convert wire format to service format
+                let service_posts: Vec<crate::services::PostSummary> = posts
+                    .into_iter()
+                    .map(|p| crate::services::PostSummary {
+                        post_id: p.post_id,
+                        author_peer_id: p.author_peer_id,
+                        lamport_clock: p.lamport_clock,
+                        content_type: p.content_type,
+                        has_media: p.has_media,
+                        media_hashes: p.media_hashes,
+                        created_at: p.created_at,
+                    })
+                    .collect();
+
                 match content_sync_service.process_manifest_response(
                     &responder_peer_id,
-                    &posts,
+                    &service_posts,
                     has_more,
                     &next_cursor,
                     timestamp,
@@ -1351,52 +1474,201 @@ impl NetworkService {
                 }
             }
 
+            NetworkCommand::AddRelayServer { address } => {
+                // Parse the multiaddress to extract peer ID if present
+                if let Some(relay_peer_id) = address.iter().find_map(|proto| {
+                    if let libp2p::multiaddr::Protocol::P2p(peer_id) = proto {
+                        Some(peer_id)
+                    } else {
+                        None
+                    }
+                }) {
+                    // Add to Kademlia routing table, but only if there is a non-P2p component
+                    let addr_without_peer: Multiaddr = address
+                        .iter()
+                        .filter(|p| !matches!(p, libp2p::multiaddr::Protocol::P2p(_)))
+                        .collect();
+
+                    if addr_without_peer.is_empty() {
+                        // No transport components (e.g. address is just /p2p/<peer_id>), so skip Kademlia
+                        info!(
+                            "Relay server {} has no non-P2p components in address {}; skipping Kademlia add_address",
+                            relay_peer_id, address
+                        );
+                    } else {
+                        self.swarm
+                            .behaviour_mut()
+                            .kademlia
+                            .add_address(&relay_peer_id, addr_without_peer);
+                        info!("Added relay server: {} at {}", relay_peer_id, address);
+                    }
+
+                    // Try to dial the relay server using the full multiaddr (including /p2p)
+                    match self.swarm.dial(address.clone()) {
+                        Ok(_) => {
+                            info!("Dialing relay server: {}", address);
+                            NetworkResponse::Ok
+                        }
+                        Err(e) => {
+                            NetworkResponse::Error(format!("Failed to dial relay server: {}", e))
+                        }
+                    }
+                } else {
+                    NetworkResponse::Error(
+                        "Relay address must contain peer ID (/p2p/...)".to_string(),
+                    )
+                }
+            }
+
+            NetworkCommand::ConnectToPublicRelays => {
+                // Reset the flag to allow reconnection
+                self.relay_connection_attempted = false;
+                // Trigger connection to public relays
+                // This is done in a non-blocking way, actual connection happens asynchronously
+                info!("Manually triggering connection to public relay servers...");
+                NetworkResponse::Ok
+            }
+
             NetworkCommand::SyncFeed { limit } => {
                 // Clamp the limit to avoid pathological or abusive requests.
                 const MAX_MANIFEST_LIMIT: u32 = 1000;
-                let limit = limit.min(MAX_MANIFEST_LIMIT);
+                let clamped_limit = limit.min(MAX_MANIFEST_LIMIT);
 
                 let Some(ref content_sync_service) = self.content_sync_service else {
                     return NetworkResponse::Error("Content sync service unavailable".to_string());
                 };
 
-                // Request manifest from each connected peer (excluding ourselves).
-                for peer_id in self.connected_peers.keys() {
-                    let peer_id_str = peer_id.to_string();
-                    let cursor = match content_sync_service.get_sync_cursor(&peer_id_str) {
-                        Ok(c) => c,
-                        Err(e) => {
-                            warn!("Failed to load sync cursor for {}: {}", peer_id, e);
+                // Avoid borrow issues: collect peer ids first.
+                let connected_peer_ids: Vec<PeerId> =
+                    self.connected_peers.keys().cloned().collect();
+
+                // Request manifest from each connected peer (excluding ourselves, if present).
+                for peer_id in connected_peer_ids {
+                    let peer_id_string = peer_id.to_string();
+                    let cursor = match content_sync_service.get_sync_cursor(&peer_id_string) {
+                        Ok(cursor_value) => cursor_value,
+                        Err(error) => {
+                            warn!("Failed to load sync cursor for {}: {}", peer_id, error);
                             HashMap::new()
                         }
                     };
 
-                    let req = match content_sync_service.create_manifest_request(cursor, limit) {
-                        Ok(r) => r,
-                        Err(e) => {
-                            warn!("Failed to create manifest request: {}", e);
-                            continue;
-                        }
-                    };
+                    let manifest_request =
+                        match content_sync_service.create_manifest_request(cursor, clamped_limit) {
+                            Ok(request_value) => request_value,
+                            Err(error) => {
+                                warn!(
+                                    "Failed to create manifest request for {}: {}",
+                                    peer_id, error
+                                );
+                                continue;
+                            }
+                        };
 
-                    let msg = ContentSyncRequest::Manifest {
-                        requester_peer_id: req.requester_peer_id,
-                        cursor: req.cursor,
-                        limit: req.limit,
-                        timestamp: req.timestamp,
-                        signature: req.signature,
+                    let wire_message = ContentSyncRequest::Manifest {
+                        requester_peer_id: manifest_request.requester_peer_id,
+                        cursor: manifest_request.cursor,
+                        limit: manifest_request.limit,
+                        timestamp: manifest_request.timestamp,
+                        signature: manifest_request.signature,
                     };
 
                     self.swarm
                         .behaviour_mut()
                         .content_sync
-                        .send_request(peer_id, msg);
+                        .send_request(&peer_id, wire_message);
                 }
+
+                NetworkResponse::Ok
+            }
+
+            NetworkCommand::RequestContentManifest {
+                peer_id,
+                cursor,
+                limit,
+            } => {
+                const MAX_MANIFEST_LIMIT: u32 = 1000;
+                let clamped_limit = limit.min(MAX_MANIFEST_LIMIT);
+
+                let Some(ref content_sync_service) = self.content_sync_service else {
+                    return NetworkResponse::Error("Content sync service unavailable".to_string());
+                };
+
+                let manifest_request =
+                    match content_sync_service.create_manifest_request(cursor, clamped_limit) {
+                        Ok(request_value) => request_value,
+                        Err(error) => {
+                            return NetworkResponse::Error(format!(
+                                "Failed to create manifest request: {}",
+                                error
+                            ));
+                        }
+                    };
+
+                let wire_message = ContentSyncRequest::Manifest {
+                    requester_peer_id: manifest_request.requester_peer_id,
+                    cursor: manifest_request.cursor,
+                    limit: manifest_request.limit,
+                    timestamp: manifest_request.timestamp,
+                    signature: manifest_request.signature,
+                };
+
+                self.swarm
+                    .behaviour_mut()
+                    .content_sync
+                    .send_request(&peer_id, wire_message);
+
+                NetworkResponse::Ok
+            }
+
+            NetworkCommand::RequestContentFetch {
+                peer_id,
+                post_id,
+                include_media,
+            } => {
+                let Some(ref content_sync_service) = self.content_sync_service else {
+                    return NetworkResponse::Error("Content sync service unavailable".to_string());
+                };
+
+                let fetch_request = match content_sync_service
+                    .create_fetch_request(post_id.clone(), include_media)
+                {
+                    Ok(request_value) => request_value,
+                    Err(error) => {
+                        return NetworkResponse::Error(format!(
+                            "Failed to create content fetch request: {}",
+                            error
+                        ));
+                    }
+                };
+
+                let wire_message = ContentSyncRequest::FetchPost {
+                    requester_peer_id: fetch_request.requester_peer_id,
+                    post_id: fetch_request.post_id,
+                    include_media: fetch_request.include_media,
+                    timestamp: fetch_request.timestamp,
+                    signature: fetch_request.signature,
+                };
+
+                self.swarm
+                    .behaviour_mut()
+                    .content_sync
+                    .send_request(&peer_id, wire_message);
 
                 NetworkResponse::Ok
             }
 
             NetworkCommand::Shutdown => NetworkResponse::Ok,
         }
+    }
+
+    /// Attempt to connect to public relay servers
+    /// This is called when we detect we're behind NAT or when manually requested
+    pub async fn try_connect_to_relays(&mut self) {
+        if self.relay_connection_attempted {
+            info!("Already attempted to connect to relays, skipping");
+            return;
+        }
+        self.connect_to_relays().await;
     }
 }

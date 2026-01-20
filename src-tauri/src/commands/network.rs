@@ -132,7 +132,7 @@ pub async fn start_network(
     let identity_arc: Arc<IdentityService> = (*identity_service).clone();
     let (mut service, handle, mut event_rx) = NetworkService::new(config, identity_arc, keypair)?;
 
-    // Inject services for message processing, contact storage, and permissions
+    // Inject services for message processing, contact storage, permissions, and content sync
     service.set_messaging_service((*messaging_service).clone());
     service.set_contacts_service((*contacts_service).clone());
     service.set_permissions_service((*permissions_service).clone());
@@ -221,6 +221,38 @@ pub async fn add_bootstrap_node(
         .map_err(|e| AppError::Validation(format!("Invalid multiaddress: {}", e)))?;
 
     handle.add_bootstrap_node(addr).await
+}
+
+/// Add a custom relay server address
+#[tauri::command]
+pub async fn add_relay_server(
+    network: State<'_, NetworkState>,
+    multiaddr: String,
+) -> Result<(), AppError> {
+    let handle: NetworkHandle = network.get_handle().await?;
+
+    let addr: libp2p::Multiaddr = multiaddr
+        .parse()
+        .map_err(|e| AppError::Validation(format!("Invalid multiaddress: {}", e)))?;
+
+    handle.add_relay_server(addr).await
+}
+
+/// Connect to public relay servers for NAT traversal
+#[tauri::command]
+pub async fn connect_to_public_relays(network: State<'_, NetworkState>) -> Result<(), AppError> {
+    let handle: NetworkHandle = network.get_handle().await?;
+    handle.connect_to_public_relays().await
+}
+
+/// Get detailed NAT status from network stats
+#[tauri::command]
+pub async fn get_nat_status(
+    network: State<'_, NetworkState>,
+) -> Result<crate::p2p::NatStatus, AppError> {
+    let handle: NetworkHandle = network.get_handle().await?;
+    let stats = handle.get_stats().await?;
+    Ok(stats.nat_status)
 }
 
 /// Trigger feed sync from connected peers
