@@ -21,8 +21,8 @@ const PUBLIC_RELAYS: &[&str] = &[
 ];
 
 use super::behaviour::{
-    ChatBehaviour, ChatBehaviourEvent, IdentityExchangeRequest, IdentityExchangeResponse,
-    ContentSyncRequest, ContentSyncResponse, MessagingRequest, MessagingResponse,
+    ChatBehaviour, ChatBehaviourEvent, ContentSyncRequest, ContentSyncResponse,
+    IdentityExchangeRequest, IdentityExchangeResponse, MessagingRequest, MessagingResponse,
 };
 use super::config::NetworkConfig;
 use super::protocols::messaging::{MessagingCodec, MessagingMessage};
@@ -30,7 +30,10 @@ use super::swarm::build_swarm;
 use super::types::*;
 use crate::db::Capability;
 use crate::error::{AppError, Result};
-use crate::services::{ContentSyncService, ContactsService, IdentityService, MessagingService, PermissionsService, PostsService};
+use crate::services::{
+    ContactsService, ContentSyncService, IdentityService, MessagingService, PermissionsService,
+    PostsService,
+};
 use std::sync::Arc;
 
 /// Handle to interact with the network service
@@ -440,16 +443,12 @@ impl NetworkService {
         channel: ResponseChannel<ContentSyncResponse>,
     ) {
         let Some(ref content_sync_service) = self.content_sync_service else {
-            let _ = self
-                .swarm
-                .behaviour_mut()
-                .content_sync
-                .send_response(
-                    channel,
-                    ContentSyncResponse::Error {
-                        error: "Content sync service unavailable".to_string(),
-                    },
-                );
+            let _ = self.swarm.behaviour_mut().content_sync.send_response(
+                channel,
+                ContentSyncResponse::Error {
+                    error: "Content sync service unavailable".to_string(),
+                },
+            );
             return;
         };
 
@@ -463,16 +462,12 @@ impl NetworkService {
             } => {
                 // Ensure peer id matches claimed requester
                 if requester_peer_id != peer.to_string() {
-                    let _ = self
-                        .swarm
-                        .behaviour_mut()
-                        .content_sync
-                        .send_response(
-                            channel,
-                            ContentSyncResponse::Error {
-                                error: "requester_peer_id mismatch".to_string(),
-                            },
-                        );
+                    let _ = self.swarm.behaviour_mut().content_sync.send_response(
+                        channel,
+                        ContentSyncResponse::Error {
+                            error: "requester_peer_id mismatch".to_string(),
+                        },
+                    );
                     return;
                 }
 
@@ -503,16 +498,12 @@ impl NetworkService {
                         }
                     }
                     Err(e) => {
-                        let _ = self
-                            .swarm
-                            .behaviour_mut()
-                            .content_sync
-                            .send_response(
-                                channel,
-                                ContentSyncResponse::Error {
-                                    error: e.to_string(),
-                                },
-                            );
+                        let _ = self.swarm.behaviour_mut().content_sync.send_response(
+                            channel,
+                            ContentSyncResponse::Error {
+                                error: e.to_string(),
+                            },
+                        );
                     }
                 }
             }
@@ -526,30 +517,22 @@ impl NetworkService {
                 // For now, we don't implement post/media fetch. Manifest sync is the first step.
                 // If requested, respond with error until the full fetch protocol is added.
                 if requester_peer_id != peer.to_string() {
-                    let _ = self
-                        .swarm
-                        .behaviour_mut()
-                        .content_sync
-                        .send_response(
-                            channel,
-                            ContentSyncResponse::Error {
-                                error: "requester_peer_id mismatch".to_string(),
-                            },
-                        );
+                    let _ = self.swarm.behaviour_mut().content_sync.send_response(
+                        channel,
+                        ContentSyncResponse::Error {
+                            error: "requester_peer_id mismatch".to_string(),
+                        },
+                    );
                     return;
                 }
 
                 let Some(ref posts_service) = self.posts_service else {
-                    let _ = self
-                        .swarm
-                        .behaviour_mut()
-                        .content_sync
-                        .send_response(
-                            channel,
-                            ContentSyncResponse::Error {
-                                error: "Posts service unavailable".to_string(),
-                            },
-                        );
+                    let _ = self.swarm.behaviour_mut().content_sync.send_response(
+                        channel,
+                        ContentSyncResponse::Error {
+                            error: "Posts service unavailable".to_string(),
+                        },
+                    );
                     return;
                 };
 
@@ -572,28 +555,20 @@ impl NetworkService {
                             .send_response(channel, response);
                     }
                     Ok(None) => {
-                        let _ = self
-                            .swarm
-                            .behaviour_mut()
-                            .content_sync
-                            .send_response(
-                                channel,
-                                ContentSyncResponse::Error {
-                                    error: "Post not found".to_string(),
-                                },
-                            );
+                        let _ = self.swarm.behaviour_mut().content_sync.send_response(
+                            channel,
+                            ContentSyncResponse::Error {
+                                error: "Post not found".to_string(),
+                            },
+                        );
                     }
                     Err(e) => {
-                        let _ = self
-                            .swarm
-                            .behaviour_mut()
-                            .content_sync
-                            .send_response(
-                                channel,
-                                ContentSyncResponse::Error {
-                                    error: e.to_string(),
-                                },
-                            );
+                        let _ = self.swarm.behaviour_mut().content_sync.send_response(
+                            channel,
+                            ContentSyncResponse::Error {
+                                error: e.to_string(),
+                            },
+                        );
                     }
                 }
             }
@@ -827,12 +802,10 @@ impl NetworkService {
                 );
 
                 // Build relay circuit address: /p2p/RELAY/p2p-circuit/p2p/LOCAL
-                let relay_circuit_addr: Multiaddr = format!(
-                    "/p2p/{}/p2p-circuit/p2p/{}",
-                    relay_peer_id, local_peer_id
-                )
-                .parse()
-                .unwrap();
+                let relay_circuit_addr: Multiaddr =
+                    format!("/p2p/{}/p2p-circuit/p2p/{}", relay_peer_id, local_peer_id)
+                        .parse()
+                        .unwrap();
 
                 // Store the relay address if not already present
                 if !self.relay_addresses.contains(&relay_circuit_addr) {
@@ -867,7 +840,10 @@ impl NetworkService {
                 debug!("Outbound circuit established via relay {}", relay_peer_id);
             }
 
-            relay::client::Event::InboundCircuitEstablished { src_peer_id, limit: _ } => {
+            relay::client::Event::InboundCircuitEstablished {
+                src_peer_id,
+                limit: _,
+            } => {
                 debug!("Inbound circuit established from {}", src_peer_id);
             }
         }
@@ -1290,11 +1266,8 @@ impl NetworkService {
                 let mut stats = self.stats.clone();
                 stats.uptime_seconds = self.start_time.elapsed().as_secs();
                 stats.nat_status = self.nat_status;
-                stats.relay_addresses = self
-                    .relay_addresses
-                    .iter()
-                    .map(|a| a.to_string())
-                    .collect();
+                stats.relay_addresses =
+                    self.relay_addresses.iter().map(|a| a.to_string()).collect();
                 stats.external_addresses = self
                     .external_addresses
                     .iter()
