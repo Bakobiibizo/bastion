@@ -73,6 +73,7 @@ pub async fn bootstrap_network(network: State<'_, NetworkState>) -> Result<(), A
 }
 
 /// Start the P2P network (called after identity is unlocked)
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn start_network(
     app: AppHandle,
