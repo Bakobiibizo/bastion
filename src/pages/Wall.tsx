@@ -161,8 +161,7 @@ export function WallPage() {
       await updatePost(postId, editContent.trim());
       setEditContent('');
       toast.success('Post updated!');
-    } catch (err) {
-      console.error('Failed to update post:', err);
+    } catch {
       toast.error('Failed to update post');
     }
   };
