@@ -37,11 +37,15 @@ function getContactColor(peerId: string): string {
   return colors[Math.abs(hash) % colors.length];
 }
 
+type FeedTab = 'all' | 'saved';
+
 export function FeedPage() {
-  const { getAllFeedPosts, likePost, toggleSavePost, isPostSaved, peers } = useMockPeersStore();
+  const { getAllFeedPosts, likePost, toggleSavePost, isPostSaved, getSavedPosts, peers, savedPosts } =
+    useMockPeersStore();
   const { feedItems, loadFeed, refreshFeed } = useFeedStore();
   const { contacts, loadContacts } = useContactsStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<FeedTab>('all');
 
   // Load real feed and contacts on mount
   useEffect(() => {
@@ -93,12 +97,38 @@ export function FeedPage() {
     );
   }, [mockPosts]);
 
+  // Get saved posts from store
+  const savedPostsData = useMemo(() => getSavedPosts(), [savedPosts, peers]);
+
+  // Convert saved posts to unified format
+  const savedUnifiedPosts: UnifiedPost[] = useMemo(() => {
+    return savedPostsData.map(
+      (post): UnifiedPost => ({
+        id: post.id,
+        content: post.content,
+        timestamp: post.timestamp,
+        likes: post.likes,
+        comments: post.comments,
+        likedByUser: post.likedByUser,
+        author: {
+          peerId: post.author.peerId,
+          name: post.author.name,
+          avatarGradient: post.author.avatarGradient,
+        },
+        isReal: false,
+      }),
+    );
+  }, [savedPostsData]);
+
   // Combine and sort all posts by timestamp (newest first)
-  const posts: UnifiedPost[] = useMemo(() => {
+  const allPosts: UnifiedPost[] = useMemo(() => {
     return [...realPosts, ...mockUnifiedPosts].sort(
       (a, b) => b.timestamp.getTime() - a.timestamp.getTime(),
     );
   }, [realPosts, mockUnifiedPosts]);
+
+  // Select posts based on active tab
+  const posts: UnifiedPost[] = activeTab === 'saved' ? savedUnifiedPosts : allPosts;
 
   const formatDate = (date: Date) => {
     const now = new Date();
@@ -184,29 +214,78 @@ export function FeedPage() {
         className="px-6 py-4 border-b flex-shrink-0"
         style={{ borderColor: 'hsl(var(--harbor-border-subtle))' }}
       >
-        <div className="max-w-3xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold" style={{ color: 'hsl(var(--harbor-text-primary))' }}>
-              Feed
-            </h1>
-            <p className="text-sm mt-1" style={{ color: 'hsl(var(--harbor-text-secondary))' }}>
-              Updates from your contacts
-            </p>
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1
+                className="text-2xl font-bold"
+                style={{ color: 'hsl(var(--harbor-text-primary))' }}
+              >
+                Feed
+              </h1>
+              <p className="text-sm mt-1" style={{ color: 'hsl(var(--harbor-text-secondary))' }}>
+                {activeTab === 'saved' ? 'Your saved posts' : 'Updates from your contacts'}
+              </p>
+            </div>
+
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing || activeTab === 'saved'}
+              className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+              style={{
+                background: 'hsl(var(--harbor-surface-1))',
+                color: 'hsl(var(--harbor-text-secondary))',
+                border: '1px solid hsl(var(--harbor-border-subtle))',
+                opacity: isRefreshing || activeTab === 'saved' ? 0.6 : 1,
+              }}
+            >
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
           </div>
 
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
-            style={{
-              background: 'hsl(var(--harbor-surface-1))',
-              color: 'hsl(var(--harbor-text-secondary))',
-              border: '1px solid hsl(var(--harbor-border-subtle))',
-              opacity: isRefreshing ? 0.6 : 1,
-            }}
-          >
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </button>
+          {/* Tabs */}
+          <div className="flex gap-1 p-1 rounded-lg" style={{ background: 'hsl(var(--harbor-surface-1))' }}>
+            <button
+              onClick={() => setActiveTab('all')}
+              className="flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200"
+              style={{
+                background: activeTab === 'all'
+                  ? 'linear-gradient(135deg, hsl(var(--harbor-primary)), hsl(var(--harbor-accent)))'
+                  : 'transparent',
+                color: activeTab === 'all' ? 'white' : 'hsl(var(--harbor-text-secondary))',
+                boxShadow: activeTab === 'all' ? '0 2px 8px hsl(var(--harbor-primary) / 0.3)' : 'none',
+              }}
+            >
+              All Posts
+            </button>
+            <button
+              onClick={() => setActiveTab('saved')}
+              className="flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2"
+              style={{
+                background: activeTab === 'saved'
+                  ? 'linear-gradient(135deg, hsl(var(--harbor-primary)), hsl(var(--harbor-accent)))'
+                  : 'transparent',
+                color: activeTab === 'saved' ? 'white' : 'hsl(var(--harbor-text-secondary))',
+                boxShadow: activeTab === 'saved' ? '0 2px 8px hsl(var(--harbor-primary) / 0.3)' : 'none',
+              }}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+              </svg>
+              Saved
+              {savedUnifiedPosts.length > 0 && (
+                <span
+                  className="px-1.5 py-0.5 rounded-full text-xs"
+                  style={{
+                    background: activeTab === 'saved' ? 'rgba(255,255,255,0.2)' : 'hsl(var(--harbor-primary) / 0.15)',
+                    color: activeTab === 'saved' ? 'white' : 'hsl(var(--harbor-primary))',
+                  }}
+                >
+                  {savedUnifiedPosts.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -218,35 +297,68 @@ export function FeedPage() {
                 className="w-20 h-20 rounded-lg flex items-center justify-center mx-auto mb-4"
                 style={{ background: 'hsl(var(--harbor-surface-1))' }}
               >
-                <FeedIcon
-                  className="w-10 h-10"
-                  style={{ color: 'hsl(var(--harbor-text-tertiary))' }}
-                />
+                {activeTab === 'saved' ? (
+                  <svg
+                    className="w-10 h-10"
+                    style={{ color: 'hsl(var(--harbor-text-tertiary))' }}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                    />
+                  </svg>
+                ) : (
+                  <FeedIcon
+                    className="w-10 h-10"
+                    style={{ color: 'hsl(var(--harbor-text-tertiary))' }}
+                  />
+                )}
               </div>
               <h3
                 className="text-lg font-semibold mb-2"
                 style={{ color: 'hsl(var(--harbor-text-primary))' }}
               >
-                Your feed is empty
+                {activeTab === 'saved' ? 'No saved posts' : 'Your feed is empty'}
               </h3>
               <p
                 className="text-sm max-w-xs mx-auto mb-4"
                 style={{ color: 'hsl(var(--harbor-text-tertiary))' }}
               >
-                When your contacts share posts and grant you permission to view them, they'll appear
-                here.
+                {activeTab === 'saved'
+                  ? 'Save posts from your feed to view them here later.'
+                  : "When your contacts share posts and grant you permission to view them, they'll appear here."}
               </p>
-              <button
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
-                style={{
-                  background:
-                    'linear-gradient(135deg, hsl(var(--harbor-primary)), hsl(var(--harbor-accent)))',
-                  color: 'white',
-                  boxShadow: '0 4px 12px hsl(var(--harbor-primary) / 0.3)',
-                }}
-              >
-                Find Contacts
-              </button>
+              {activeTab === 'saved' ? (
+                <button
+                  onClick={() => setActiveTab('all')}
+                  className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, hsl(var(--harbor-primary)), hsl(var(--harbor-accent)))',
+                    color: 'white',
+                    boxShadow: '0 4px 12px hsl(var(--harbor-primary) / 0.3)',
+                  }}
+                >
+                  Browse Feed
+                </button>
+              ) : (
+                <button
+                  className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, hsl(var(--harbor-primary)), hsl(var(--harbor-accent)))',
+                    color: 'white',
+                    boxShadow: '0 4px 12px hsl(var(--harbor-primary) / 0.3)',
+                  }}
+                >
+                  Find Contacts
+                </button>
+              )}
             </div>
           ) : (
             posts.map((post) => {

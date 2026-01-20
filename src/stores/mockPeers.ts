@@ -402,6 +402,13 @@ interface MockPeersState {
   // Saved posts actions
   toggleSavePost: (peerId: string, postId: string) => void;
   isPostSaved: (peerId: string, postId: string) => boolean;
+  getSavedPosts: () => Array<
+    MockPost & {
+      author: Pick<MockPeer, 'id' | 'name' | 'avatarGradient' | 'peerId'>;
+      likedByUser: boolean;
+      savedAt: Date;
+    }
+  >;
 }
 
 // Initial user posts (demo data)
@@ -615,5 +622,36 @@ export const useMockPeersStore = create<MockPeersState>((set, get) => ({
 
   isPostSaved: (peerId: string, postId: string) => {
     return get().savedPosts.some((s) => s.peerId === peerId && s.postId === postId);
+  },
+
+  getSavedPosts: () => {
+    const { savedPosts, peers, likedPosts } = get();
+
+    return savedPosts
+      .map((saved) => {
+        // Find the peer who authored the post
+        const peer = peers.find((p) => p.peerId === saved.peerId);
+        if (!peer) return null;
+
+        // Find the post in the peer's wall
+        const post = peer.wall.find((p) => p.id === saved.postId);
+        if (!post) return null;
+
+        const likeKey = `${peer.peerId}:${post.id}`;
+
+        return {
+          ...post,
+          author: {
+            id: peer.id,
+            name: peer.name,
+            avatarGradient: peer.avatarGradient,
+            peerId: peer.peerId,
+          },
+          likedByUser: likedPosts.has(likeKey),
+          savedAt: saved.savedAt,
+        };
+      })
+      .filter((p): p is NonNullable<typeof p> => p !== null)
+      .sort((a, b) => b.savedAt.getTime() - a.savedAt.getTime());
   },
 }));
