@@ -161,13 +161,13 @@ fn generate_rss_xml(
                 r#"    <item>
       <title>{}</title>
       <link>{}</link>
-      <description><![CDATA[{}]]></description>
+      <description>{}</description>
       <pubDate>{}</pubDate>
       <guid isPermaLink="false">{}</guid>
     </item>"#,
                 xml_escape(&title),
                 xml_escape(&link),
-                description,
+                xml_escape(&description),
                 pub_date,
                 xml_escape(&guid)
             )
