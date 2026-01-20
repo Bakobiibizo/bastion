@@ -81,7 +81,7 @@ describe("useNetworkStore", () => {
 
       expect(useNetworkStore.getState().isRunning).toBe(false);
       expect(useNetworkStore.getState().status).toBe("disconnected");
-      expect(useNetworkStore.getState().error).toBe("Error: Network error");
+      expect(useNetworkStore.getState().error).toBe("Network error");
     });
   });
 
@@ -144,7 +144,7 @@ describe("useNetworkStore", () => {
         useNetworkStore.getState().connectToPeer("/ip4/1.2.3.4/tcp/9000")
       ).rejects.toThrow("Connection failed");
 
-      expect(useNetworkStore.getState().error).toBe("Error: Connection failed");
+      expect(useNetworkStore.getState().error).toBe("Connection failed");
     });
   });
 
