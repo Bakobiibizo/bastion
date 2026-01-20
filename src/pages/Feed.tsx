@@ -1,8 +1,108 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { FeedIcon, EllipsisIcon } from '../components/icons';
 import { useMockPeersStore, useFeedStore, useContactsStore } from '../stores';
 import type { FeedItem } from '../types';
+
+// Dropdown menu component
+function PostMenu({
+  isOpen,
+  onClose,
+  onHide,
+  onSnooze,
+  authorName,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onHide: () => void;
+  onSnooze: (hours: number) => void;
+  authorName: string;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      ref={menuRef}
+      className="absolute right-0 top-full mt-1 w-56 rounded-lg shadow-lg z-50 overflow-hidden"
+      style={{
+        background: 'hsl(var(--harbor-bg-elevated))',
+        border: '1px solid hsl(var(--harbor-border-subtle))',
+      }}
+    >
+      <button
+        onClick={() => {
+          onHide();
+          onClose();
+        }}
+        className="w-full px-4 py-3 text-left text-sm flex items-center gap-3 transition-colors hover:bg-white/5"
+        style={{ color: 'hsl(var(--harbor-text-primary))' }}
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+        </svg>
+        Hide this post
+      </button>
+      <div style={{ borderTop: '1px solid hsl(var(--harbor-border-subtle))' }}>
+        <div className="px-4 py-2 text-xs" style={{ color: 'hsl(var(--harbor-text-tertiary))' }}>
+          Snooze {authorName}
+        </div>
+        <button
+          onClick={() => {
+            onSnooze(24);
+            onClose();
+          }}
+          className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors hover:bg-white/5"
+          style={{ color: 'hsl(var(--harbor-text-primary))' }}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          For 24 hours
+        </button>
+        <button
+          onClick={() => {
+            onSnooze(24 * 7);
+            onClose();
+          }}
+          className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors hover:bg-white/5"
+          style={{ color: 'hsl(var(--harbor-text-primary))' }}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          For 7 days
+        </button>
+        <button
+          onClick={() => {
+            onSnooze(24 * 30);
+            onClose();
+          }}
+          className="w-full px-4 py-2.5 text-left text-sm flex items-center gap-3 transition-colors hover:bg-white/5"
+          style={{ color: 'hsl(var(--harbor-text-primary))' }}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+          </svg>
+          For 30 days
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // Unified post type for both real and mock posts
 interface UnifiedPost {
@@ -40,12 +140,26 @@ function getContactColor(peerId: string): string {
 type FeedTab = 'all' | 'saved';
 
 export function FeedPage() {
-  const { getAllFeedPosts, likePost, toggleSavePost, isPostSaved, getSavedPosts, peers, savedPosts } =
-    useMockPeersStore();
+  const {
+    getAllFeedPosts,
+    likePost,
+    toggleSavePost,
+    isPostSaved,
+    getSavedPosts,
+    peers,
+    savedPosts,
+    hiddenPosts,
+    snoozedUsers,
+    hidePost,
+    isPostHidden,
+    snoozeUser,
+    isUserSnoozed,
+  } = useMockPeersStore();
   const { feedItems, loadFeed, refreshFeed } = useFeedStore();
   const { contacts, loadContacts } = useContactsStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<FeedTab>('all');
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Load real feed and contacts on mount
   useEffect(() => {
@@ -121,11 +235,20 @@ export function FeedPage() {
   }, [savedPostsData]);
 
   // Combine and sort all posts by timestamp (newest first)
+  // Filter out hidden posts and posts from snoozed users
   const allPosts: UnifiedPost[] = useMemo(() => {
-    return [...realPosts, ...mockUnifiedPosts].sort(
-      (a, b) => b.timestamp.getTime() - a.timestamp.getTime(),
-    );
-  }, [realPosts, mockUnifiedPosts]);
+    return [...realPosts, ...mockUnifiedPosts]
+      .filter((post) => {
+        // Don't filter real posts (they don't support hide/snooze yet)
+        if (post.isReal) return true;
+        // Filter out hidden posts
+        if (isPostHidden(post.author.peerId, post.id)) return false;
+        // Filter out posts from snoozed users
+        if (isUserSnoozed(post.author.peerId)) return false;
+        return true;
+      })
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  }, [realPosts, mockUnifiedPosts, hiddenPosts, snoozedUsers]);
 
   // Select posts based on active tab
   const posts: UnifiedPost[] = activeTab === 'saved' ? savedUnifiedPosts : allPosts;
@@ -201,10 +324,23 @@ export function FeedPage() {
     return isPostSaved(post.author.peerId, post.id);
   };
 
-  const handlePostMenu = (authorName: string) => {
-    toast(`Post options for ${authorName}'s post`, {
-      icon: '📋',
-    });
+  const handleHidePost = (post: UnifiedPost) => {
+    if (post.isReal) {
+      toast('Hiding P2P posts coming soon!', { icon: '👁️' });
+      return;
+    }
+    hidePost(post.author.peerId, post.id);
+    toast.success('Post hidden from your feed');
+  };
+
+  const handleSnoozeUser = (post: UnifiedPost, hours: number) => {
+    if (post.isReal) {
+      toast('Snoozing P2P contacts coming soon!', { icon: '😴' });
+      return;
+    }
+    snoozeUser(post.author.peerId, hours);
+    const duration = hours < 48 ? `${hours} hours` : `${Math.round(hours / 24)} days`;
+    toast.success(`${post.author.name} snoozed for ${duration}`);
   };
 
   return (
@@ -426,15 +562,24 @@ export function FeedPage() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => handlePostMenu(post.author.name)}
-                      className="p-2 rounded-lg transition-colors duration-200 hover:bg-white/5"
-                      style={{
-                        color: 'hsl(var(--harbor-text-tertiary))',
-                      }}
-                    >
-                      <EllipsisIcon className="w-5 h-5" />
-                    </button>
+                    <div className="relative">
+                      <button
+                        onClick={() => setOpenMenuId(openMenuId === post.id ? null : post.id)}
+                        className="p-2 rounded-lg transition-colors duration-200 hover:bg-white/5"
+                        style={{
+                          color: 'hsl(var(--harbor-text-tertiary))',
+                        }}
+                      >
+                        <EllipsisIcon className="w-5 h-5" />
+                      </button>
+                      <PostMenu
+                        isOpen={openMenuId === post.id}
+                        onClose={() => setOpenMenuId(null)}
+                        onHide={() => handleHidePost(post)}
+                        onSnooze={(hours) => handleSnoozeUser(post, hours)}
+                        authorName={post.author.name}
+                      />
+                    </div>
                   </div>
 
                   {/* Post content */}
