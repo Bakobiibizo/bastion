@@ -7,6 +7,7 @@ interface MessagingState {
   conversations: Conversation[];
   messages: Record<string, Message[]>; // keyed by peerId
   activeConversation: string | null;
+  selectedConversationId: string | null; // UI state for selected conversation (includes mock)
   isLoading: boolean;
   error: string | null;
 
@@ -19,6 +20,8 @@ interface MessagingState {
     contentType?: string,
   ) => Promise<SendMessageResult>;
   setActiveConversation: (peerId: string | null) => void;
+  setSelectedConversation: (id: string | null) => void;
+  clearConversationSelection: () => void;
   handleIncomingMessage: (message: Message) => void;
   markConversationRead: (peerId: string) => Promise<void>;
 }
@@ -28,6 +31,7 @@ export const useMessagingStore = create<MessagingState>((set, get) => ({
   conversations: [],
   messages: {},
   activeConversation: null,
+  selectedConversationId: null,
   isLoading: false,
   error: null,
 
@@ -109,6 +113,16 @@ export const useMessagingStore = create<MessagingState>((set, get) => ({
     if (peerId) {
       get().loadMessages(peerId);
     }
+  },
+
+  // Set selected conversation (UI state, includes mock conversations)
+  setSelectedConversation: (id: string | null) => {
+    set({ selectedConversationId: id });
+  },
+
+  // Clear conversation selection (used when clicking Messages in sidebar)
+  clearConversationSelection: () => {
+    set({ selectedConversationId: null, activeConversation: null });
   },
 
   // Handle incoming message from Tauri event

@@ -1,32 +1,24 @@
 pub mod commands;
 pub mod db;
 pub mod error;
+pub mod logging;
 pub mod models;
 pub mod p2p;
 pub mod services;
 
 use commands::NetworkState;
 use db::Database;
+use logging::{get_log_directory, LogConfig};
 use services::{
-    CallingService, ContactsService, FeedService, IdentityService, MessagingService,
-    PermissionsService, PostsService,
+    AccountsService, CallingService, ContactsService, ContentSyncService, FeedService,
+    IdentityService, MessagingService, PermissionsService, PostsService,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Manager;
 use tracing::info;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-/// Initialize logging
-fn init_logging() {
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "harbor_lib=debug,tauri=info".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
-}
+pub struct LogDirectory(pub PathBuf);
 
 /// Get the profile name from environment variable (for multi-instance support)
 fn get_profile_name() -> Option<String> {
@@ -70,27 +62,62 @@ fn get_db_path(app: &tauri::AppHandle) -> PathBuf {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    init_logging();
-
     let profile = get_profile_name();
-    if let Some(ref p) = profile {
-        info!("Starting Harbor with profile: {}", p);
-    } else {
-        info!("Starting Harbor...");
-    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(move |app| {
+            // Get app data directory first so we can set up logging properly
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .expect("Failed to get app data directory");
+
+            // Set up log directory
+            let log_dir = get_log_directory(&app_data_dir);
+
+            // Initialize logging with appropriate config based on build type
+            #[cfg(debug_assertions)]
+            {
+                logging::init_logging(LogConfig::development());
+            }
+            #[cfg(not(debug_assertions))]
+            {
+                // Production: enable file logging with JSON format
+                logging::init_logging(LogConfig::production(log_dir.clone()));
+                // Clean up old log files
+                if let Err(e) = logging::cleanup_old_logs(&log_dir, 5) {
+                    // Can't use info! here as logging might not be fully set up
+                    eprintln!("Could not clean up old logs: {}", e);
+                }
+            }
+
+            if let Some(ref p) = profile {
+                info!("Starting Harbor with profile: {}", p);
+            } else {
+                info!("Starting Harbor...");
+            }
+
             // Update window title if running with a profile
             if let Some(ref profile_name) = profile {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.set_title(&format!("Harbor - {}", profile_name));
                 }
             }
+
+            app.manage(LogDirectory(log_dir));
+
+            // Initialize accounts service (manages multi-account registry)
+            let accounts_service = Arc::new(AccountsService::new(app_data_dir.clone()));
+
             // Initialize database
-            let db_path = get_db_path(&app.handle());
+            let db_path = get_db_path(app.handle());
             info!("Database path: {:?}", db_path);
+
+            // Migrate legacy single-account setup if needed
+            if let Ok(Some(account)) = accounts_service.migrate_legacy_account(&db_path) {
+                info!("Migrated legacy account: {}", account.display_name);
+            }
 
             let db = Arc::new(Database::new(db_path).expect("Failed to initialize database"));
 
@@ -125,17 +152,25 @@ pub fn run() {
                 contacts_service.clone(),
                 permissions_service.clone(),
             ));
+            let content_sync_service = Arc::new(ContentSyncService::new(
+                db.clone(),
+                identity_service.clone(),
+                contacts_service.clone(),
+                permissions_service.clone(),
+            ));
 
             // Initialize network state (will be populated when identity is unlocked)
             let network_state = NetworkState::new();
 
             // Register state
             app.manage(db);
+            app.manage(accounts_service);
             app.manage(identity_service);
             app.manage(contacts_service);
             app.manage(permissions_service);
             app.manage(messaging_service);
             app.manage(posts_service);
+            app.manage(content_sync_service);
             app.manage(feed_service);
             app.manage(calling_service);
             app.manage(network_state);
@@ -144,6 +179,14 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // Account commands (multi-user support)
+            commands::list_accounts,
+            commands::get_account,
+            commands::get_active_account,
+            commands::has_accounts,
+            commands::set_active_account,
+            commands::remove_account,
+            commands::update_account_metadata,
             // Identity commands
             commands::has_identity,
             commands::is_identity_unlocked,
@@ -163,7 +206,18 @@ pub fn run() {
             commands::stop_network,
             commands::get_listening_addresses,
             commands::connect_to_peer,
+            commands::sync_feed,
             commands::add_bootstrap_node,
+            commands::get_shareable_addresses,
+            commands::add_relay_server,
+            commands::connect_to_public_relays,
+            commands::get_nat_status,
+            // Bootstrap configuration commands
+            commands::get_bootstrap_nodes,
+            commands::add_bootstrap_node_config,
+            commands::update_bootstrap_node,
+            commands::remove_bootstrap_node,
+            commands::get_enabled_bootstrap_addresses,
             // Contact commands
             commands::get_contacts,
             commands::get_active_contacts,
@@ -203,6 +257,18 @@ pub fn run() {
             // Feed commands
             commands::get_feed,
             commands::get_wall,
+            commands::get_wall_preview,
+            commands::get_wall_visibility_stats,
+            // RSS commands
+            commands::generate_rss_feed,
+            commands::get_peer_rss_feed,
+            commands::get_rss_feed_url,
+            // Like commands
+            commands::like_post,
+            commands::unlike_post,
+            commands::get_post_likes,
+            commands::get_posts_likes_batch,
+            commands::get_my_liked_posts,
             // Calling commands
             commands::start_call,
             commands::answer_call,
@@ -212,6 +278,16 @@ pub fn run() {
             commands::process_answer,
             commands::process_ice_candidate,
             commands::process_hangup,
+            // Logging commands
+            commands::export_logs,
+            commands::get_log_path,
+            commands::cleanup_logs,
+            // Content sync commands
+            commands::request_content_manifest,
+            commands::request_content_manifest_with_cursor,
+            commands::request_content_fetch,
+            commands::get_sync_cursor,
+            commands::sync_with_all_peers,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

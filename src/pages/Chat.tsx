@@ -65,9 +65,12 @@ export function ChatPage() {
     loadMessages,
     sendMessage: sendRealMessage,
     setActiveConversation,
+    selectedConversationId,
+    setSelectedConversation,
   } = useMessagingStore();
 
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  // Use store's selectedConversationId
+  const selectedConversation = selectedConversationId;
 
   // Keep the store's activeConversation in sync with local selectedConversation
   // This is needed for the event handler to know which conversation to refresh

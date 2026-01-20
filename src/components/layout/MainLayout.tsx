@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useIdentityStore, useSettingsStore, useNetworkStore } from '../../stores';
+import { useIdentityStore, useSettingsStore, useNetworkStore, useMessagingStore } from '../../stores';
 import {
   ChatIcon,
   WallIcon,
@@ -54,6 +54,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   const { state, lock } = useIdentityStore();
   const { showOnlineStatus, avatarUrl } = useSettingsStore();
   const { isRunning, status, stats } = useNetworkStore();
+  const { clearConversationSelection } = useMessagingStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [isLocking, setIsLocking] = useState(false);
@@ -222,8 +223,15 @@ export function MainLayout({ children }: MainLayoutProps) {
             const isActive = location.pathname.startsWith(item.to);
             const Icon = item.icon;
 
+            // Handle click - clear conversation selection when clicking Messages
+            const handleNavClick = () => {
+              if (item.to === '/chat') {
+                clearConversationSelection();
+              }
+            };
+
             return (
-              <NavLink key={item.to} to={item.to} className="group block">
+              <NavLink key={item.to} to={item.to} className="group block" onClick={handleNavClick}>
                 <div
                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200"
                   style={{

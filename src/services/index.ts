@@ -1,3 +1,4 @@
+export { accountsService } from './accounts';
 export { identityService } from './identity';
 export * as networkService from './network';
 export { contactsService } from './contacts';
@@ -6,3 +7,4 @@ export { messagingService } from './messaging';
 export { postsService } from './posts';
 export { feedService } from './feed';
 export { callingService } from './calling';
+export * as loggingService from './logging';

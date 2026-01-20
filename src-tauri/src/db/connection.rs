@@ -7,6 +7,8 @@ const MIGRATION_001: &str = include_str!("migrations/001_initial.sql");
 const MIGRATION_002: &str = include_str!("migrations/002_schema_fixes.sql");
 const MIGRATION_003: &str = include_str!("migrations/003_lamport_sync_cursor.sql");
 const MIGRATION_004: &str = include_str!("migrations/004_messages_nonce.sql");
+const MIGRATION_005: &str = include_str!("migrations/005_post_likes.sql");
+const MIGRATION_006: &str = include_str!("migrations/006_bootstrap_nodes.sql");
 
 /// Database wrapper for SQLite connection management
 pub struct Database {
@@ -20,7 +22,7 @@ impl Database {
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
-                .map_err(|_| rusqlite::Error::InvalidPath(path.clone().into()))?;
+                .map_err(|_| rusqlite::Error::InvalidPath(path.clone()))?;
         }
 
         let conn = Connection::open(&path)?;
@@ -89,6 +91,18 @@ impl Database {
             info!("Running migration 004...");
             conn.execute_batch(MIGRATION_004)?;
             info!("Migration 004 complete");
+        }
+
+        if version < 5 {
+            info!("Running migration 005...");
+            conn.execute_batch(MIGRATION_005)?;
+            info!("Migration 005 complete");
+        }
+
+        if version < 6 {
+            info!("Running migration 006...");
+            conn.execute_batch(MIGRATION_006)?;
+            info!("Migration 006 complete");
         }
 
         Ok(())

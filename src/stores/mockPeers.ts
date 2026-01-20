@@ -373,12 +373,26 @@ export interface SavedPost {
   savedAt: Date;
 }
 
+export interface HiddenPost {
+  postId: string;
+  peerId: string;
+  hiddenAt: Date;
+}
+
+export interface SnoozedUser {
+  peerId: string;
+  snoozedAt: Date;
+  snoozedUntil: Date; // When snooze expires
+}
+
 // Zustand store interface
 interface MockPeersState {
   peers: MockPeer[];
   conversations: MockConversation[];
   userPosts: UserPost[];
   savedPosts: SavedPost[];
+  hiddenPosts: HiddenPost[];
+  snoozedUsers: SnoozedUser[];
   likedPosts: Set<string>; // Track which feed posts user has liked (format: "peerId:postId")
 
   // Actions
@@ -402,6 +416,23 @@ interface MockPeersState {
   // Saved posts actions
   toggleSavePost: (peerId: string, postId: string) => void;
   isPostSaved: (peerId: string, postId: string) => boolean;
+  getSavedPosts: () => Array<
+    MockPost & {
+      author: Pick<MockPeer, 'id' | 'name' | 'avatarGradient' | 'peerId'>;
+      likedByUser: boolean;
+      savedAt: Date;
+    }
+  >;
+
+  // Hidden posts actions
+  hidePost: (peerId: string, postId: string) => void;
+  unhidePost: (peerId: string, postId: string) => void;
+  isPostHidden: (peerId: string, postId: string) => boolean;
+
+  // Snoozed users actions
+  snoozeUser: (peerId: string, durationHours: number) => void;
+  unsnoozeUser: (peerId: string) => void;
+  isUserSnoozed: (peerId: string) => boolean;
 }
 
 // Initial user posts (demo data)
@@ -440,6 +471,8 @@ export const useMockPeersStore = create<MockPeersState>((set, get) => ({
   conversations: initialConversations,
   userPosts: initialUserPosts,
   savedPosts: [],
+  hiddenPosts: [],
+  snoozedUsers: [],
   likedPosts: new Set<string>(),
 
   sendMessage: (conversationId: string, content: string) => {
@@ -615,5 +648,80 @@ export const useMockPeersStore = create<MockPeersState>((set, get) => ({
 
   isPostSaved: (peerId: string, postId: string) => {
     return get().savedPosts.some((s) => s.peerId === peerId && s.postId === postId);
+  },
+
+  getSavedPosts: () => {
+    const { savedPosts, peers, likedPosts } = get();
+
+    return savedPosts
+      .map((saved) => {
+        // Find the peer who authored the post
+        const peer = peers.find((p) => p.peerId === saved.peerId);
+        if (!peer) return null;
+
+        // Find the post in the peer's wall
+        const post = peer.wall.find((p) => p.id === saved.postId);
+        if (!post) return null;
+
+        const likeKey = `${peer.peerId}:${post.id}`;
+
+        return {
+          ...post,
+          author: {
+            id: peer.id,
+            name: peer.name,
+            avatarGradient: peer.avatarGradient,
+            peerId: peer.peerId,
+          },
+          likedByUser: likedPosts.has(likeKey),
+          savedAt: saved.savedAt,
+        };
+      })
+      .filter((p): p is NonNullable<typeof p> => p !== null)
+      .sort((a, b) => b.savedAt.getTime() - a.savedAt.getTime());
+  },
+
+  // Hidden posts actions
+  hidePost: (peerId: string, postId: string) => {
+    set((state) => ({
+      hiddenPosts: [...state.hiddenPosts, { peerId, postId, hiddenAt: new Date() }],
+    }));
+  },
+
+  unhidePost: (peerId: string, postId: string) => {
+    set((state) => ({
+      hiddenPosts: state.hiddenPosts.filter(
+        (h) => !(h.peerId === peerId && h.postId === postId),
+      ),
+    }));
+  },
+
+  isPostHidden: (peerId: string, postId: string) => {
+    return get().hiddenPosts.some((h) => h.peerId === peerId && h.postId === postId);
+  },
+
+  // Snoozed users actions
+  snoozeUser: (peerId: string, durationHours: number) => {
+    const now = new Date();
+    const snoozedUntil = new Date(now.getTime() + durationHours * 60 * 60 * 1000);
+    set((state) => ({
+      snoozedUsers: [
+        ...state.snoozedUsers.filter((s) => s.peerId !== peerId),
+        { peerId, snoozedAt: now, snoozedUntil },
+      ],
+    }));
+  },
+
+  unsnoozeUser: (peerId: string) => {
+    set((state) => ({
+      snoozedUsers: state.snoozedUsers.filter((s) => s.peerId !== peerId),
+    }));
+  },
+
+  isUserSnoozed: (peerId: string) => {
+    const snooze = get().snoozedUsers.find((s) => s.peerId === peerId);
+    if (!snooze) return false;
+    // Check if snooze has expired
+    return new Date() < snooze.snoozedUntil;
   },
 }));
