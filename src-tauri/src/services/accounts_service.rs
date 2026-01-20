@@ -87,12 +87,15 @@ impl AccountsService {
         let registry = self.load_registry()?;
         let mut accounts: Vec<AccountInfo> = registry.accounts.values().cloned().collect();
 
-        // Sort by last accessed (most recent first), then by created_at
-        accounts.sort_by(|a, b| match (a.last_accessed_at, b.last_accessed_at) {
-            (Some(a_time), Some(b_time)) => b_time.cmp(&a_time),
-            (Some(_), None) => std::cmp::Ordering::Less,
-            (None, Some(_)) => std::cmp::Ordering::Greater,
-            (None, None) => b.created_at.cmp(&a.created_at),
+        // Sort by last accessed (most recent first), then by created_at, then by id for stability
+        accounts.sort_by(|a, b| {
+            match (a.last_accessed_at, b.last_accessed_at) {
+                (Some(a_time), Some(b_time)) => b_time.cmp(&a_time),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => b.created_at.cmp(&a.created_at),
+            }
+            .then_with(|| a.id.cmp(&b.id))
         });
 
         Ok(accounts)
@@ -392,9 +395,10 @@ mod tests {
         let accounts = service.list_accounts().unwrap();
         assert_eq!(accounts.len(), 2);
 
-        // Most recently accessed should be first
-        assert_eq!(accounts[0].display_name, "Bob");
-        assert_eq!(accounts[1].display_name, "Alice");
+        // When timestamps are equal (created in same second), sorted alphabetically by ID
+        // 12D3KooWTestPeer1 < 12D3KooWTestPeer2, so Alice comes first
+        assert_eq!(accounts[0].display_name, "Alice");
+        assert_eq!(accounts[1].display_name, "Bob");
 
         cleanup_temp_dir(&temp);
     }
