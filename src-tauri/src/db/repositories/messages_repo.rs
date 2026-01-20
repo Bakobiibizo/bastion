@@ -14,6 +14,7 @@ pub enum MessageStatus {
 }
 
 impl MessageStatus {
+    #[allow(clippy::should_implement_trait)]
     pub fn as_str(&self) -> &'static str {
         match self {
             MessageStatus::Pending => "pending",
