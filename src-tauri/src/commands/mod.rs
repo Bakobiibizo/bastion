@@ -1,4 +1,5 @@
 pub mod accounts;
+pub mod bootstrap;
 pub mod calling;
 pub mod contacts;
 pub mod content_sync;
@@ -11,6 +12,7 @@ pub mod permissions;
 pub mod posts;
 
 pub use accounts::*;
+pub use bootstrap::*;
 pub use calling::*;
 pub use contacts::*;
 pub use content_sync::*;
