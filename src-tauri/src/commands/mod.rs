@@ -1,6 +1,7 @@
 pub mod accounts;
 pub mod calling;
 pub mod contacts;
+pub mod content_sync;
 pub mod feed;
 pub mod identity;
 pub mod messaging;
@@ -11,6 +12,7 @@ pub mod posts;
 pub use accounts::*;
 pub use calling::*;
 pub use contacts::*;
+pub use content_sync::*;
 pub use feed::*;
 pub use identity::*;
 pub use messaging::*;

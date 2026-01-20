@@ -132,7 +132,7 @@ pub async fn start_network(
     let identity_arc: Arc<IdentityService> = (*identity_service).clone();
     let (mut service, handle, mut event_rx) = NetworkService::new(config, identity_arc, keypair)?;
 
-    // Inject services for message processing, contact storage, and permissions
+    // Inject services for message processing, contact storage, permissions, and content sync
     service.set_messaging_service((*messaging_service).clone());
     service.set_contacts_service((*contacts_service).clone());
     service.set_permissions_service((*permissions_service).clone());

@@ -4,6 +4,7 @@ use libp2p::{
     swarm::NetworkBehaviour,
     StreamProtocol,
 };
+use std::collections::HashMap;
 use std::time::Duration;
 
 use super::protocols::{CONTENT_SYNC_PROTOCOL, IDENTITY_PROTOCOL, MESSAGING_PROTOCOL};
@@ -72,10 +73,30 @@ pub struct MessagingResponse {
     pub error: Option<String>,
 }
 
-/// Content sync request
+/// Post summary for content sync manifest
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PostSummaryProto {
+    pub post_id: String,
+    pub author_peer_id: String,
+    pub lamport_clock: u64,
+    pub content_type: String,
+    pub has_media: bool,
+    pub media_hashes: Vec<String>,
+    pub created_at: i64,
+}
+
+/// Content sync request (manifest request)
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum ContentSyncRequest {
+pub struct ContentSyncRequest {
+    pub request_type: String, // "manifest" or "fetch"
+    pub requester_peer_id: String,
+    pub cursor: HashMap<String, u64>,
+    pub limit: u32,
+    pub post_id: Option<String>, // For fetch requests
+    pub include_media: bool,
+    pub timestamp: i64,
+    pub signature: Vec<u8>,
     /// Request a manifest of posts newer than the provided cursor
     Manifest {
         requester_peer_id: String,
@@ -95,9 +116,30 @@ pub enum ContentSyncRequest {
 }
 
 /// Content sync response
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ContentSyncResponse {
+
+    pub response_type: String, // "manifest" or "fetch"
+    pub responder_peer_id: String,
+    // Manifest response fields
+    pub posts: Vec<PostSummaryProto>,
+    pub has_more: bool,
+    pub next_cursor: HashMap<String, u64>,
+    // Fetch response fields
+    pub post_id: Option<String>,
+    pub author_peer_id: Option<String>,
+    pub content_type: Option<String>,
+    pub content_text: Option<String>,
+    pub visibility: Option<String>,
+    pub lamport_clock: Option<u64>,
+    pub created_at: Option<i64>,
+    pub post_signature: Vec<u8>,
+    // Common fields
+    pub timestamp: i64,
+    pub signature: Vec<u8>,
+    pub success: bool,
+    pub error: Option<String>,
     Manifest {
         responder_peer_id: String,
         posts: Vec<crate::services::PostSummary>,
