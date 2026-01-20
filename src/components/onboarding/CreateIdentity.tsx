@@ -52,14 +52,14 @@ export function CreateIdentity({ onBack }: CreateIdentityProps) {
         bio: bio.trim() || undefined,
       });
 
-      // Register the new account in the accounts registry
+      // Ensure the new account is reflected in the accounts store
       try {
         await accountsService.listAccounts().then(async (accounts) => {
-          // Only register if not already in registry (migration case)
           const exists = accounts.some((a) => a.peerId === identity.peerId);
-          if (!exists) {
-            // The backend will register it when the identity is created
-            // Just reload the accounts list
+
+          // In the normal case, the backend now returns the new account.
+          // When it's present, refresh the in-memory accounts store.
+          if (exists) {
             await loadAccounts();
           }
         });
