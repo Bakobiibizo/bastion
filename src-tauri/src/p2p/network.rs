@@ -15,7 +15,7 @@ use tracing::{debug, error, info, warn};
 /// Harbor's own relay is listed first for priority, followed by IPFS bootstrap nodes
 const PUBLIC_RELAYS: &[&str] = &[
     // Harbor community relay (primary)
-    "/ip4/154.5.126.219/tcp/4001/p2p/12D3KooWBNWtWMxJCeP6LDFK5qzhSCkvF34kV1kCEGAobjAnvYSN",
+    "/ip4/154.5.126.219/tcp/4001/p2p/12D3KooWN88G5V8fTAHCwLnsbxiC9ZM6i982sno8bh3m7bvLMvvJ",
     // IPFS bootstrap relays (fallback)
     "/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
     "/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa",
