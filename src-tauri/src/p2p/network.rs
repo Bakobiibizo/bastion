@@ -16,9 +16,7 @@ use tracing::{debug, error, info, warn};
 /// and RSA-based peer IDs that are incompatible with relay v2.
 const PUBLIC_RELAYS: &[&str] = &[
     // Harbor community relay (primary) - IPv6
-    "/ip6/2001:569:7b51:5500:78a9:3c0e:2ec9:c682/tcp/4001/p2p/12D3KooWN88G5V8fTAHCwLnsbxiC9ZM6i982sno8bh3m7bvLMvvJ",
-    // Fallback IPv4 (local network only due to NAT)
-    "/ip4/192.168.1.71/tcp/4001/p2p/12D3KooWN88G5V8fTAHCwLnsbxiC9ZM6i982sno8bh3m7bvLMvvJ",
+    "/ip4/18.204.214.94/tcp/4001/p2p/12D3KooWHi81G15poZuH4BL5WnifQ3b2S2uSkvsa1wAhBZNA8PW9",
 ];
 
 /// Public relay servers specifically for relay circuits (if available)

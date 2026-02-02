@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import toast from 'react-hot-toast';
 import { useIdentityStore, useNetworkStore, useContactsStore, useSettingsStore } from '../stores';
@@ -13,6 +13,7 @@ import {
   XIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  TrashIcon,
 } from '../components/icons';
 import { RELAY_CLOUDFORMATION_TEMPLATE } from '../constants/cloudformation-template';
 
@@ -134,7 +135,7 @@ export function NetworkPage() {
     connectToPublicRelays,
   } = useNetworkStore();
 
-  const { contacts } = useContactsStore();
+  const { contacts, refreshContacts } = useContactsStore();
   const { autoStartNetwork, localDiscovery, setAutoStartNetwork, setLocalDiscovery } =
     useSettingsStore();
 
@@ -150,6 +151,8 @@ export function NetworkPage() {
   const [showManualConnect, setShowManualConnect] = useState(false);
   const [showLocalAddresses, setShowLocalAddresses] = useState(false);
   const [showDeployRelay, setShowDeployRelay] = useState(false);
+  const [natDetectionTimedOut, setNatDetectionTimedOut] = useState(false);
+  const relayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Check network status on mount and set up refresh interval
   useEffect(() => {
@@ -166,6 +169,45 @@ export function NetworkPage() {
 
     return () => clearInterval(interval);
   }, [isRunning, checkStatus, refreshPeers, refreshStats, refreshAddresses, refreshShareableAddresses]);
+
+  // Fix 3: Relay "Connecting..." spinner timeout (30s)
+  useEffect(() => {
+    if (relayTimeoutRef.current) {
+      clearTimeout(relayTimeoutRef.current);
+      relayTimeoutRef.current = null;
+    }
+
+    if (relayStatus === 'connecting') {
+      relayTimeoutRef.current = setTimeout(() => {
+        const currentStatus = useNetworkStore.getState().relayStatus;
+        if (currentStatus === 'connecting') {
+          useNetworkStore.getState().setRelayStatus('disconnected');
+          toast.error('Relay connection timed out. The relay may be unreachable.');
+        }
+      }, 30_000);
+    }
+
+    return () => {
+      if (relayTimeoutRef.current) {
+        clearTimeout(relayTimeoutRef.current);
+        relayTimeoutRef.current = null;
+      }
+    };
+  }, [relayStatus]);
+
+  // Fix 4: NAT status "Detecting..." timeout (30s)
+  useEffect(() => {
+    if (stats.natStatus !== 'unknown' || !isRunning) {
+      setNatDetectionTimedOut(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setNatDetectionTimedOut(true);
+    }, 30_000);
+
+    return () => clearTimeout(timeout);
+  }, [isRunning, stats.natStatus]);
 
   // Handlers
   const handleConnectToRelay = async () => {
@@ -260,13 +302,15 @@ export function NetworkPage() {
     return `${secs}s`;
   };
 
-  // Filter peers by search
+  // Filter peers by search (also checks contact display names)
   const filteredPeers = connectedPeers.filter((peer) => {
     const query = searchQuery.toLowerCase();
     if (!query) return true;
     const friendlyName = getPeerFriendlyName(peer.peerId).toLowerCase();
+    const contactName = contacts.find((contact) => contact.peerId === peer.peerId)?.displayName?.toLowerCase() ?? '';
     return (
       friendlyName.includes(query) ||
+      contactName.includes(query) ||
       peer.peerId.toLowerCase().includes(query) ||
       peer.addresses.some((addr) => addr.toLowerCase().includes(query))
     );
@@ -402,7 +446,9 @@ export function NetworkPage() {
                           : 'hsl(var(--harbor-text-primary))',
                     }}
                   >
-                    {stats.natStatus === 'unknown' ? 'Detecting...' : stats.natStatus === 'public' ? 'Public' : stats.natStatus === 'private' ? 'Relayed' : 'Behind NAT'}
+                    {stats.natStatus === 'unknown'
+                      ? (natDetectionTimedOut ? 'Unable to detect' : 'Detecting...')
+                      : stats.natStatus === 'public' ? 'Public' : stats.natStatus === 'private' ? 'Relayed' : 'Behind NAT'}
                   </p>
                 </div>
               </div>
@@ -817,27 +863,30 @@ export function NetworkPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {discoveredPeers.map((peer) => (
-                      <PeerRow
-                        key={peer.peerId}
-                        peerId={peer.peerId}
-
-                        actionLabel="Connect"
-                        actionStyle="primary"
-                        onAction={async () => {
-                          if (peer.addresses.length > 0) {
-                            try {
-                              await connectToPeer(peer.addresses[0]);
-                              toast.success('Connecting...');
-                            } catch (err) {
-                              toast.error(`Failed: ${err}`);
+                    {discoveredPeers.map((peer) => {
+                      const knownContact = contacts.find((contact) => contact.peerId === peer.peerId);
+                      return (
+                        <PeerRow
+                          key={peer.peerId}
+                          peerId={peer.peerId}
+                          displayName={knownContact?.displayName}
+                          actionLabel="Connect"
+                          actionStyle="primary"
+                          onAction={async () => {
+                            if (peer.addresses.length > 0) {
+                              try {
+                                await connectToPeer(peer.addresses[0]);
+                                toast.success('Connecting...');
+                              } catch (err) {
+                                toast.error(`Failed: ${err}`);
+                              }
+                            } else {
+                              toast.error('No address available for this peer');
                             }
-                          } else {
-                            toast.error('No address available for this peer');
-                          }
-                        }}
-                      />
-                    ))}
+                          }}
+                        />
+                      );
+                    })}
                   </div>
                 )
               ) : activeTab === 'connected' ? (
@@ -859,24 +908,28 @@ export function NetworkPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {connectedPeersList.map((peer) => (
-                      <PeerRow
-                        key={peer.peerId}
-                        peerId={peer.peerId}
-
-                        isConnected
-                        actionLabel="Add Contact"
-                        actionStyle="success"
-                        onAction={async () => {
-                          try {
-                            await contactsService.requestPeerIdentity(peer.peerId);
-                            toast.success(`Requesting identity from ${getPeerFriendlyName(peer.peerId)}...`);
-                          } catch (err) {
-                            toast.error(`Failed to add contact: ${err}`);
-                          }
-                        }}
-                      />
-                    ))}
+                    {connectedPeersList.map((peer) => {
+                      const knownContact = contacts.find((contact) => contact.peerId === peer.peerId);
+                      const displayName = knownContact?.displayName;
+                      return (
+                        <PeerRow
+                          key={peer.peerId}
+                          peerId={peer.peerId}
+                          displayName={displayName}
+                          isConnected
+                          actionLabel={knownContact ? 'Message' : 'Add Contact'}
+                          actionStyle="success"
+                          onAction={async () => {
+                            try {
+                              await contactsService.requestPeerIdentity(peer.peerId);
+                              toast.success(`Requesting identity from ${displayName ?? getPeerFriendlyName(peer.peerId)}...`);
+                            } catch (err) {
+                              toast.error(`Failed to add contact: ${err}`);
+                            }
+                          }}
+                        />
+                      );
+                    })}
                   </div>
                 )
               ) : (
@@ -930,6 +983,22 @@ export function NetworkPage() {
                             {contact.bio}
                           </p>
                         )}
+                        <button
+                          className="p-2 rounded-lg hover:bg-white/10 transition-colors flex-shrink-0"
+                          style={{ color: 'hsl(var(--harbor-text-tertiary))' }}
+                          title="Remove contact"
+                          onClick={async () => {
+                            try {
+                              await contactsService.removeContact(contact.peerId);
+                              await refreshContacts();
+                              toast.success(`Removed ${contact.displayName} from contacts`);
+                            } catch (err) {
+                              toast.error(`Failed to remove contact: ${err}`);
+                            }
+                          }}
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -1070,20 +1139,22 @@ export function NetworkPage() {
 
 function PeerRow({
   peerId,
+  displayName,
   isConnected,
   actionLabel,
   actionStyle,
   onAction,
 }: {
   peerId: string;
+  displayName?: string;
   isConnected?: boolean;
   actionLabel: string;
   actionStyle: 'primary' | 'success';
   onAction: () => Promise<void>;
 }) {
-  const friendlyName = getPeerFriendlyName(peerId);
+  const friendlyName = displayName ?? getPeerFriendlyName(peerId);
   const avatarColor = getPeerColor(peerId);
-  const initials = friendlyName.split(' ').map((word) => word[0]).join('');
+  const initials = friendlyName.split(' ').map((word) => word[0]).join('').toUpperCase().slice(0, 2);
 
   return (
     <div
