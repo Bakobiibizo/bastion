@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import toast from 'react-hot-toast';
 import { useIdentityStore, useNetworkStore, useContactsStore, useSettingsStore } from '../stores';
 import { contactsService } from '../services/contacts';
@@ -1199,17 +1200,23 @@ function DeployRelayContent() {
           </span>
         </div>
         <button
-          onClick={() => {
-            const blob = new Blob([RELAY_CLOUDFORMATION_TEMPLATE], { type: 'application/x-yaml' });
-            const url = URL.createObjectURL(blob);
-            const anchor = document.createElement('a');
-            anchor.href = url;
-            anchor.download = 'harbor-relay-cloudformation.yaml';
-            document.body.appendChild(anchor);
-            anchor.click();
-            document.body.removeChild(anchor);
-            URL.revokeObjectURL(url);
-            toast.success('Template downloaded!');
+          onClick={async () => {
+            try {
+              const savedPath = await invoke<string>('save_to_downloads', {
+                filename: 'harbor-relay-cloudformation.yaml',
+                content: RELAY_CLOUDFORMATION_TEMPLATE,
+              });
+              toast.success(`Template saved to ${savedPath}`);
+            } catch (error) {
+              console.error('Failed to save template via Tauri:', error);
+              // Fallback: copy to clipboard
+              try {
+                await navigator.clipboard.writeText(RELAY_CLOUDFORMATION_TEMPLATE);
+                toast.success('Template copied to clipboard! Paste it into a .yaml file.');
+              } catch {
+                toast.error(`Save failed: ${error}`);
+              }
+            }
           }}
           className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium"
           style={{ background: 'linear-gradient(135deg, #FF9900, #FF6600)', color: 'white' }}
