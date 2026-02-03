@@ -77,3 +77,7 @@
 
 - Describe the notable changes here.
 
+## 2026-02-03 - v0.1.1
+
+- Describe the notable changes here.
+
