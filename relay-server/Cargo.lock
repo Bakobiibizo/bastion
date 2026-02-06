@@ -59,31 +59,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ai-harbor-relay"
-version = "0.1.0"
-dependencies = [
- "axum",
- "chrono",
- "ciborium",
- "clap",
- "dirs",
- "ed25519-dalek",
- "futures",
- "isnad",
- "libp2p",
- "rand 0.8.5",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2",
- "tokio",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -359,6 +334,31 @@ name = "base64ct"
 version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
+
+[[package]]
+name = "bastion-relay"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "ciborium",
+ "clap",
+ "dirs",
+ "ed25519-dalek",
+ "futures",
+ "isnad",
+ "libp2p",
+ "rand 0.8.5",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
 
 [[package]]
 name = "bitflags"

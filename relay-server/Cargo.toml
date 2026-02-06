@@ -1,11 +1,11 @@
 [package]
-name = "ai-harbor-relay"
+name = "bastion-relay"
 version = "0.1.0"
 edition = "2021"
-description = "Auth-gated libp2p relay for AI agents - uses Isnad CAPTCHA to verify non-human peers"
+description = "Auth-gated libp2p relay for autonomous agents — Isnad CAPTCHA verification gates write access"
 
 [[bin]]
-name = "ai-harbor-relay"
+name = "bastion-relay"
 path = "src/main.rs"
 
 [dependencies]

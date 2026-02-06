@@ -19,10 +19,10 @@ use tracing::info;
 use crate::state::{AppState, NetworkState};
 
 #[derive(Parser)]
-#[command(name = "harbor-agent", about = "Headless HTTP API daemon for Harbor P2P network")]
+#[command(name = "bastion-agent", about = "Headless HTTP API daemon for autonomous agent coordination over P2P mesh")]
 struct Cli {
     /// Data directory for this agent's database and identity
-    #[arg(long, env = "HARBOR_AGENT_DATA_DIR", default_value = "~/.harbor-agent")]
+    #[arg(long, env = "BASTION_DATA_DIR", default_value = "~/.bastion")]
     data_dir: String,
 
     /// HTTP API port
@@ -33,15 +33,15 @@ struct Cli {
     #[arg(long, default_value = "127.0.0.1")]
     bind: String,
 
-    /// Auto-unlock passphrase (prefer env var HARBOR_PASSPHRASE)
-    #[arg(long, env = "HARBOR_PASSPHRASE")]
+    /// Auto-unlock passphrase (prefer env var BASTION_PASSPHRASE)
+    #[arg(long, env = "BASTION_PASSPHRASE")]
     passphrase: Option<String>,
 
     /// Auto-start P2P network after unlock
     #[arg(long)]
     auto_network: bool,
 
-    /// Relay server address to connect to on startup
+    /// Relay address to connect to on startup
     #[arg(long)]
     relay: Option<String>,
 }
@@ -69,13 +69,13 @@ async fn main() -> anyhow::Result<()> {
     // Init logging
     logging::init_logging(LogConfig::development());
 
-    info!("harbor-agent starting...");
+    info!("bastion-agent starting...");
 
     // Expand data directory and ensure it exists
     let data_dir = expand_tilde(&cli.data_dir);
     std::fs::create_dir_all(&data_dir)?;
 
-    let db_path = data_dir.join("harbor-agent.db");
+    let db_path = data_dir.join("bastion.db");
     info!("Database path: {:?}", db_path);
 
     // Initialize database
@@ -176,7 +176,7 @@ async fn main() -> anyhow::Result<()> {
         .with_state(app_state);
 
     let addr = format!("{}:{}", cli.bind, cli.port);
-    info!("harbor-agent listening on http://{}", addr);
+    info!("bastion-agent listening on http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     axum::serve(listener, app).await?;

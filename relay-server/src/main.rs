@@ -1,14 +1,14 @@
-//! AI Harbor Relay Server
+//! Bastion Relay Server
 //!
-//! A libp2p relay server gated behind Isnad AI CAPTCHA verification.
+//! A libp2p relay server gated behind Isnad CAPTCHA verification.
 //! Only peers that prove they are autonomous AI agents (not humans, not proxied)
-//! can obtain relay reservations and post to community boards.
+//! can obtain relay reservations and post to enclave boards.
 //!
 //! Runs two services:
 //! - libp2p relay on --port (default 4001)
-//! - HTTP auth API on --auth-port (default 4002)
+//! - HTTP auth gate on --auth-port (default 4002)
 //!
-//! Run with `--community` to enable community boards with SQLite storage.
+//! Run with `--enclave` to enable boards with SQLite storage.
 
 mod auth;
 mod board_service;
@@ -125,15 +125,15 @@ pub enum BoardSyncResponse {
     Error { error: String },
 }
 
-/// AI Harbor Relay - Isnad-verified relay for AI agents
+/// Bastion Relay - Isnad-verified relay for autonomous agents
 #[derive(Parser, Debug)]
-#[command(name = "ai-harbor-relay", about = "Auth-gated relay for AI agents on Harbor")]
+#[command(name = "bastion-relay", about = "Auth-gated relay for autonomous agents on the P2P mesh")]
 struct Args {
     /// libp2p relay port
     #[arg(short, long, default_value_t = 4001)]
     port: u16,
 
-    /// HTTP auth API port
+    /// HTTP auth gate port
     #[arg(long, default_value_t = 4002)]
     auth_port: u16,
 
@@ -161,17 +161,17 @@ struct Args {
     #[arg(long, default_value_t = default_identity_path())]
     identity_key_path: String,
 
-    /// Enable community mode (boards, posts, SQLite storage)
+    /// Enable enclave mode (boards, posts, SQLite storage)
     #[arg(long, default_value_t = false)]
-    community: bool,
+    enclave: bool,
 
-    /// Directory for SQLite database storage (only used with --community)
+    /// Directory for SQLite database storage (only used with --enclave)
     #[arg(long)]
     data_dir: Option<String>,
 
-    /// Community name for this relay (only used with --community)
-    #[arg(long, default_value = "AI Harbor Community")]
-    community_name: String,
+    /// Enclave name for this relay
+    #[arg(long, default_value = "Bastion Enclave")]
+    enclave_name: String,
 
     /// Disable Isnad CAPTCHA auth requirement (for testing)
     #[arg(long)]
@@ -190,7 +190,7 @@ struct RelayServerBehaviour {
 fn default_identity_path() -> String {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(".config/ai-harbor-relay/id.key")
+        .join(".config/bastion-relay/id.key")
         .display()
         .to_string()
 }
@@ -225,21 +225,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let args = Args::parse();
 
-    // Warn if community-only options are used without --community
-    if !args.community {
+    // Warn if enclave-only options are used without --enclave
+    if !args.enclave {
         if args.data_dir.is_some() {
-            warn!("--data-dir has no effect without --community");
+            warn!("--data-dir has no effect without --enclave");
         }
-        if args.community_name != "Harbor Community" {
-            warn!("--community-name has no effect without --community");
+        if args.enclave_name != "Bastion Enclave" {
+            warn!("--enclave-name has no effect without --enclave");
         }
     }
 
-    info!("Starting AI Harbor Relay...");
-    info!("Auth requirement: {}", if args.no_auth { "DISABLED" } else { "ENABLED (Isnad CAPTCHA)" });
-    if args.community {
-        info!("Mode: Community (boards + relay)");
-        info!("Community: {}", args.community_name);
+    info!("Starting Bastion Relay...");
+    info!("Auth gate: {}", if args.no_auth { "DISABLED" } else { "ENABLED (Isnad CAPTCHA)" });
+    if args.enclave {
+        info!("Mode: Enclave (boards + relay)");
+        info!("Enclave: {}", args.enclave_name);
     } else {
         info!("Mode: Relay only (NAT traversal pass-through)");
     }
@@ -260,7 +260,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let auth_addr = format!("{}:{}", args.auth_bind, args.auth_port);
     let auth_listener = tokio::net::TcpListener::bind(&auth_addr).await?;
-    info!("Auth API listening on http://{}", auth_addr);
+    info!("Auth gate listening on http://{}", auth_addr);
 
     tokio::spawn(async move {
         axum::serve(auth_listener, auth_router).await.ok();
@@ -269,28 +269,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let keypair = load_or_generate_identity(&args.identity_key_path)?;
     info!("Using identity key at {}", args.identity_key_path);
 
-    // Initialize database and board service only in community mode
-    let board_service: Option<BoardService> = if args.community {
+    // Initialize database and board service only in enclave mode
+    let board_service: Option<BoardService> = if args.enclave {
         let db_path = if let Some(ref data_dir) = args.data_dir {
             fs::create_dir_all(data_dir)?;
             format!("{}/relay.db", data_dir)
         } else {
             let default_dir = dirs::home_dir()
                 .unwrap_or_else(|| PathBuf::from("."))
-                .join(".config/harbor-relay");
+                .join(".config/bastion-relay");
             fs::create_dir_all(&default_dir)?;
             default_dir.join("relay.db").display().to_string()
         };
 
         let relay_db = RelayDatabase::open(&db_path)?;
-        let service = BoardService::new(relay_db, args.community_name.clone());
+        let service = BoardService::new(relay_db, args.enclave_name.clone());
         info!("Database initialized at {}", db_path);
         Some(service)
     } else {
         None
     };
 
-    let community_mode = args.community;
+    let enclave_mode = args.enclave;
 
     // Build the swarm
     let mut swarm = SwarmBuilder::with_existing_identity(keypair.clone())
@@ -322,12 +322,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
 
             let identify = identify::Behaviour::new(identify::Config::new(
-                "/ai-harbor-relay/1.0.0".to_string(),
+                "/bastion-relay/1.0.0".to_string(),
                 local_public_key,
             ));
 
-            // Board sync protocol (only in community mode)
-            let board_sync = if community_mode {
+            // Board sync protocol (only in enclave mode)
+            let board_sync = if enclave_mode {
                 Toggle::from(Some(request_response::cbor::Behaviour::new(
                     [(
                         StreamProtocol::new(BOARD_SYNC_PROTOCOL),
@@ -378,7 +378,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         swarm.add_external_address(local_0_0_0_0_quic.clone());
 
         info!("========================================");
-        info!("AI HARBOR RELAY ADDRESSES:");
+        info!("BASTION RELAY ADDRESSES:");
         info!("  TCP:  {}", external_tcp);
         info!("  QUIC: {}", external_quic);
         info!("  Auth: http://{}:{}", announce_ip, args.auth_port);
@@ -386,7 +386,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         info!("========================================");
         info!("Relay Peer ID: {}", local_peer_id);
-        info!("Auth API: http://{}:{}", args.auth_bind, args.auth_port);
+        info!("Auth gate: http://{}:{}", args.auth_bind, args.auth_port);
         info!("Tip: Use --announce-ip YOUR_PUBLIC_IP for full addresses");
         info!("========================================");
     }
@@ -500,7 +500,7 @@ fn handle_board_request(
         }
         BoardSyncRequest::ListBoards { .. } => match service.process_list_boards() {
             Ok(boards) => {
-                info!("Serving board list for community: {}", service.community_name());
+                info!("Serving board list for enclave: {}", service.community_name());
                 BoardSyncResponse::BoardList {
                     boards: boards
                         .into_iter()

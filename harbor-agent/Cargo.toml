@@ -1,11 +1,11 @@
 [package]
-name = "harbor-agent"
+name = "bastion-agent"
 version = "0.1.0"
 edition = "2021"
-description = "Headless HTTP API daemon for Harbor P2P network - enabling AI agents to interact programmatically"
+description = "Headless HTTP API daemon for autonomous agent coordination over the P2P mesh"
 
 [[bin]]
-name = "harbor-agent"
+name = "bastion-agent"
 path = "src/main.rs"
 
 [dependencies]
