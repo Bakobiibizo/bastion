@@ -1,3 +1,4 @@
+#[cfg(feature = "tauri-app")]
 pub mod commands;
 pub mod db;
 pub mod error;
@@ -6,21 +7,31 @@ pub mod models;
 pub mod p2p;
 pub mod services;
 
+#[cfg(feature = "tauri-app")]
 use commands::NetworkState;
+#[cfg(feature = "tauri-app")]
 use db::Database;
+#[cfg(feature = "tauri-app")]
 use logging::{get_log_directory, LogConfig};
+#[cfg(feature = "tauri-app")]
 use services::{
     AccountsService, BoardService, CallingService, ContactsService, ContentSyncService,
     FeedService, IdentityService, MessagingService, PermissionsService, PostsService,
 };
+#[cfg(feature = "tauri-app")]
 use std::path::PathBuf;
+#[cfg(feature = "tauri-app")]
 use std::sync::Arc;
+#[cfg(feature = "tauri-app")]
 use tauri::Manager;
+#[cfg(feature = "tauri-app")]
 use tracing::info;
 
+#[cfg(feature = "tauri-app")]
 pub struct LogDirectory(pub PathBuf);
 
 /// Get the profile name from environment variable (for multi-instance support)
+#[cfg(feature = "tauri-app")]
 fn get_profile_name() -> Option<String> {
     std::env::var("HARBOR_PROFILE")
         .ok()
@@ -28,6 +39,7 @@ fn get_profile_name() -> Option<String> {
 }
 
 /// Get custom data directory from environment variable
+#[cfg(feature = "tauri-app")]
 fn get_custom_data_dir() -> Option<PathBuf> {
     std::env::var("HARBOR_DATA_DIR")
         .ok()
@@ -36,6 +48,7 @@ fn get_custom_data_dir() -> Option<PathBuf> {
 }
 
 /// Get the database path for the application
+#[cfg(feature = "tauri-app")]
 fn get_db_path(app: &tauri::AppHandle) -> PathBuf {
     // Check for custom data directory first
     let base_dir = if let Some(custom_dir) = get_custom_data_dir() {
@@ -60,6 +73,7 @@ fn get_db_path(app: &tauri::AppHandle) -> PathBuf {
     base_dir.join("harbor.db")
 }
 
+#[cfg(feature = "tauri-app")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let profile = get_profile_name();

@@ -1,0 +1,25 @@
+[package]
+name = "harbor-agent"
+version = "0.1.0"
+edition = "2021"
+description = "Headless HTTP API daemon for Harbor P2P network - enabling AI agents to interact programmatically"
+
+[[bin]]
+name = "harbor-agent"
+path = "src/main.rs"
+
+[dependencies]
+harbor_lib = { package = "harbor", path = "../src-tauri", default-features = false }
+axum = { version = "0.7", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive", "env"] }
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tower-http = { version = "0.6", features = ["cors"] }
+libp2p = { version = "0.56", features = ["tokio"] }
+base64 = "0.22"
+futures = "0.3"
+tokio-stream = { version = "0.1", features = ["sync"] }
