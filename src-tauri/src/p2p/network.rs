@@ -16,11 +16,7 @@ use tracing::{debug, error, info, warn};
 /// and RSA-based peer IDs that are incompatible with relay v2.
 const PUBLIC_RELAYS: &[&str] = &[
     // Harbor community relay (primary)
-<<<<<<< Updated upstream
-    "/ip4/154.5.126.219/tcp/4001/p2p/12D3KooWBNWtWMxJCeP6LDFK5qzhSCkvF34kV1kCEGAobjAnvYSN",
-=======
     "/ip4/52.200.206.197/tcp/4001/p2p/12D3KooWHi81G15poZuH4BL5WnifQ3b2S2uSkvsa1wAhBZNA8PW9",
->>>>>>> Stashed changes
 ];
 
 /// Public relay servers specifically for relay circuits (if available)
