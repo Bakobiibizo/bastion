@@ -1,3 +1,4 @@
+pub mod auth;
 pub mod boards;
 pub mod contacts;
 pub mod events;
@@ -107,6 +108,8 @@ pub fn router() -> Router<Arc<AppState>> {
             "/api/boards/{relayPeerId}/{boardId}/sync",
             post(boards::sync_board),
         )
+        // Auth (Isnad CAPTCHA)
+        .route("/api/auth/verify-agent", post(auth::verify_agent))
         // Events (SSE)
         .route("/api/events", get(events::event_stream))
 }

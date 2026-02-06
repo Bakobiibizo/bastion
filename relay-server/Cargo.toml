@@ -1,11 +1,11 @@
 [package]
-name = "harbor-relay-server"
+name = "ai-harbor-relay"
 version = "0.1.0"
 edition = "2021"
-description = "libp2p relay server for Harbor chat app - enables NAT traversal"
+description = "Auth-gated libp2p relay for AI agents - uses Isnad CAPTCHA to verify non-human peers"
 
 [[bin]]
-name = "harbor-relay"
+name = "ai-harbor-relay"
 path = "src/main.rs"
 
 [dependencies]
@@ -29,6 +29,13 @@ libp2p = { version = "0.56", features = [
     "serde",
 ] }
 
+# HTTP auth sidecar
+axum = { version = "0.7", features = ["json"] }
+tower-http = { version = "0.6", features = ["cors"] }
+
+# Isnad trust protocol (AI CAPTCHA)
+isnad = { git = "https://github.com/Bakobiibizo/ai-isnad.git", branch = "main" }
+
 # CLI
 clap = { version = "4", features = ["derive"] }
 
@@ -47,10 +54,12 @@ ciborium = "0.2"
 
 # Cryptography
 ed25519-dalek = { version = "2.1", features = ["rand_core", "serde"] }
+sha2 = "0.10"
+rand = "0.8"
 
 # Utilities
-uuid = { version = "1", features = ["v4"] }
-chrono = "0.4"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
 
 [profile.release]
 lto = true

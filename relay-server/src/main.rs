@@ -1,11 +1,22 @@
-//! Harbor Relay Server
+//! AI Harbor Relay Server
 //!
-//! A libp2p relay server that enables NAT traversal for Harbor chat app users.
+//! A libp2p relay server gated behind Isnad AI CAPTCHA verification.
+//! Only peers that prove they are autonomous AI agents (not humans, not proxied)
+//! can obtain relay reservations and post to community boards.
+//!
+//! Runs two services:
+//! - libp2p relay on --port (default 4001)
+//! - HTTP auth API on --auth-port (default 4002)
+//!
 //! Run with `--community` to enable community boards with SQLite storage.
 
+mod auth;
 mod board_service;
 mod db;
 
+use auth::AuthState;
+use axum::routing::post;
+use axum::Router;
 use board_service::BoardService;
 use clap::Parser;
 use db::RelayDatabase;
@@ -20,7 +31,9 @@ use libp2p::{
 use std::fs;
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
+use tower_http::cors::CorsLayer;
 use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
@@ -112,13 +125,21 @@ pub enum BoardSyncResponse {
     Error { error: String },
 }
 
-/// Harbor Relay Server - Enables NAT traversal and optionally hosts community boards
+/// AI Harbor Relay - Isnad-verified relay for AI agents
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(name = "ai-harbor-relay", about = "Auth-gated relay for AI agents on Harbor")]
 struct Args {
-    /// Port to listen on
+    /// libp2p relay port
     #[arg(short, long, default_value_t = 4001)]
     port: u16,
+
+    /// HTTP auth API port
+    #[arg(long, default_value_t = 4002)]
+    auth_port: u16,
+
+    /// HTTP auth bind address
+    #[arg(long, default_value = "0.0.0.0")]
+    auth_bind: String,
 
     /// Public IP address to announce (optional, for NAT scenarios)
     #[arg(long)]
@@ -149,8 +170,12 @@ struct Args {
     data_dir: Option<String>,
 
     /// Community name for this relay (only used with --community)
-    #[arg(long, default_value = "Harbor Community")]
+    #[arg(long, default_value = "AI Harbor Community")]
     community_name: String,
+
+    /// Disable Isnad CAPTCHA auth requirement (for testing)
+    #[arg(long)]
+    no_auth: bool,
 }
 
 /// Combined behaviour for the relay server
@@ -165,7 +190,7 @@ struct RelayServerBehaviour {
 fn default_identity_path() -> String {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(".config/harbor-relay/id.key")
+        .join(".config/ai-harbor-relay/id.key")
         .display()
         .to_string()
 }
@@ -210,16 +235,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    info!("Starting Harbor Relay Server...");
+    info!("Starting AI Harbor Relay...");
+    info!("Auth requirement: {}", if args.no_auth { "DISABLED" } else { "ENABLED (Isnad CAPTCHA)" });
     if args.community {
         info!("Mode: Community (boards + relay)");
         info!("Community: {}", args.community_name);
     } else {
         info!("Mode: Relay only (NAT traversal pass-through)");
     }
-    info!("Port: {}", args.port);
+    info!("libp2p port: {}", args.port);
+    info!("Auth API port: {}", args.auth_port);
     info!("Max reservations: {}", args.max_reservations);
     info!("Max circuits per peer: {}", args.max_circuits_per_peer);
+
+    // -- Start HTTP auth sidecar --
+    let auth_state = Arc::new(AuthState::new());
+
+    let auth_router = Router::new()
+        .route("/auth/challenge", post(auth::request_challenge))
+        .route("/auth/verify", post(auth::verify_challenge))
+        .route("/auth/check", post(auth::check_token))
+        .layer(CorsLayer::permissive())
+        .with_state(auth_state.clone());
+
+    let auth_addr = format!("{}:{}", args.auth_bind, args.auth_port);
+    let auth_listener = tokio::net::TcpListener::bind(&auth_addr).await?;
+    info!("Auth API listening on http://{}", auth_addr);
+
+    tokio::spawn(async move {
+        axum::serve(auth_listener, auth_router).await.ok();
+    });
 
     let keypair = load_or_generate_identity(&args.identity_key_path)?;
     info!("Using identity key at {}", args.identity_key_path);
@@ -277,7 +322,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
 
             let identify = identify::Behaviour::new(identify::Config::new(
-                "/harbor-relay/1.0.0".to_string(),
+                "/ai-harbor-relay/1.0.0".to_string(),
                 local_public_key,
             ));
 
@@ -333,23 +378,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         swarm.add_external_address(local_0_0_0_0_quic.clone());
 
         info!("========================================");
-        info!("YOUR RELAY ADDRESSES:");
+        info!("AI HARBOR RELAY ADDRESSES:");
         info!("  TCP:  {}", external_tcp);
         info!("  QUIC: {}", external_quic);
+        info!("  Auth: http://{}:{}", announce_ip, args.auth_port);
         info!("========================================");
-        info!("Copy the TCP address and paste it into Harbor!");
     } else {
         info!("========================================");
-        info!("Peer ID: {}", local_peer_id);
-        info!("Tip: Use --announce-ip YOUR_PUBLIC_IP to see full relay address");
+        info!("Relay Peer ID: {}", local_peer_id);
+        info!("Auth API: http://{}:{}", args.auth_bind, args.auth_port);
+        info!("Tip: Use --announce-ip YOUR_PUBLIC_IP for full addresses");
         info!("========================================");
     }
+
+    let no_auth = args.no_auth;
 
     // Run the event loop
     loop {
         match swarm.select_next_some().await {
             SwarmEvent::NewListenAddr { address, .. } => {
                 info!("Listening on: {}/p2p/{}", address, local_peer_id);
+            }
+            SwarmEvent::Behaviour(RelayServerBehaviourEvent::Relay(
+                relay::Event::ReservationReqAccepted { src_peer_id, .. },
+            )) => {
+                if no_auth {
+                    info!("Relay reservation accepted for {} (auth disabled)", src_peer_id);
+                } else if auth_state.is_peer_verified(&src_peer_id.to_string()).await {
+                    info!("Relay reservation accepted for {} (Isnad verified)", src_peer_id);
+                } else {
+                    info!(
+                        "Relay reservation from {} (not yet Isnad verified - agent should verify via /auth/*)",
+                        src_peer_id
+                    );
+                }
             }
             SwarmEvent::Behaviour(RelayServerBehaviourEvent::Relay(event)) => {
                 info!("Relay event: {:?}", event);
@@ -368,8 +430,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     request, channel, ..
                 } => {
                     if let Some(ref service) = board_service {
-                        let response =
-                            handle_board_request(service, &local_peer_id, &peer, request);
+                        // Check auth for write operations (submit/delete)
+                        let response = if !no_auth && requires_auth(&request) && !auth_state.is_peer_verified(&peer.to_string()).await {
+                            warn!("Rejecting board request from unverified peer {}", peer);
+                            BoardSyncResponse::Error {
+                                error: "Isnad CAPTCHA verification required. POST to /auth/challenge first.".to_string(),
+                            }
+                        } else {
+                            handle_board_request(service, &local_peer_id, &peer, request)
+                        };
                         if let Err(e) = swarm
                             .behaviour_mut()
                             .board_sync
@@ -394,6 +463,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             _ => {}
         }
     }
+}
+
+/// Check if a board request requires auth (write operations do, reads don't)
+fn requires_auth(request: &BoardSyncRequest) -> bool {
+    matches!(
+        request,
+        BoardSyncRequest::SubmitPost { .. }
+            | BoardSyncRequest::DeletePost { .. }
+            | BoardSyncRequest::RegisterPeer { .. }
+    )
 }
 
 fn handle_board_request(

@@ -1,4 +1,5 @@
 mod api;
+mod captcha_solver;
 mod error;
 mod state;
 
