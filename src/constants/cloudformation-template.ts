@@ -2,7 +2,7 @@
 // This template is embedded in the app for easy copy-paste deployment
 
 export const RELAY_BINARY_SHA256 =
-  '8b78854e4311520337ffa908ee94f8ec28886371ede09ea426546e54191fc0fe';
+  'c5dcb143d69558107ced27a0dfd30542a88a69906aa53404d9b31ef97a1c66a3';
 export const RELAY_PEER_ID = '12D3KooWHi81G15poZuH4BL5WnifQ3b2S2uSkvsa1wAhBZNA8PW9';
 export const RELAY_IDENTITY_KEY_B64 =
   'CAESQKx8WZyvKhxB8KflROQ4EB1jdu+FabKRVVTRo99ulO0wdUP+7I9QeNCLNS8XaxV4JejWR1himdtbElg2ImtLBXo=';
@@ -243,7 +243,7 @@ Resources:
           echo "Stack: \${AWS::StackName}"
           echo "RelayPort: \${RelayPort}"
 
-          EXPECTED_SHA256="8b78854e4311520337ffa908ee94f8ec28886371ede09ea426546e54191fc0fe"
+          EXPECTED_SHA256="c5dcb143d69558107ced27a0dfd30542a88a69906aa53404d9b31ef97a1c66a3"
           BINARY_URL="https://github.com/bakobiibizo/harbor/raw/main/relay-server/bin/harbor-relay"
           RELAY_PEER_ID="12D3KooWHi81G15poZuH4BL5WnifQ3b2S2uSkvsa1wAhBZNA8PW9"
           IDENTITY_KEY_B64="CAESQKx8WZyvKhxB8KflROQ4EB1jdu+FabKRVVTRo99ulO0wdUP+7I9QeNCLNS8XaxV4JejWR1himdtbElg2ImtLBXo="
@@ -610,7 +610,7 @@ Resources:
           echo "RelayPort: \${RelayPort}"
           echo "CommunityName: \${CommunityName}"
 
-          EXPECTED_SHA256="8b78854e4311520337ffa908ee94f8ec28886371ede09ea426546e54191fc0fe"
+          EXPECTED_SHA256="c5dcb143d69558107ced27a0dfd30542a88a69906aa53404d9b31ef97a1c66a3"
           BINARY_URL="https://github.com/bakobiibizo/harbor/raw/main/relay-server/bin/harbor-relay"
           RELAY_PEER_ID="12D3KooWHi81G15poZuH4BL5WnifQ3b2S2uSkvsa1wAhBZNA8PW9"
           IDENTITY_KEY_B64="CAESQKx8WZyvKhxB8KflROQ4EB1jdu+FabKRVVTRo99ulO0wdUP+7I9QeNCLNS8XaxV4JejWR1himdtbElg2ImtLBXo="
