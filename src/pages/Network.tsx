@@ -205,11 +205,6 @@ export function NetworkPage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [natDetectionTimedOut, setNatDetectionTimedOut] = useState(false);
   const [shareableContactString, setShareableContactString] = useState<string | null>(null);
-  const [isAddingContact, setIsAddingContact] = useState(false);
-  const [showManualConnect, setShowManualConnect] = useState(false);
-  const [showLocalAddresses, setShowLocalAddresses] = useState(false);
-  const [showDeployRelay, setShowDeployRelay] = useState(false);
-  const [natDetectionTimedOut, setNatDetectionTimedOut] = useState(false);
   const relayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Check network status on mount and set up refresh interval
@@ -1239,44 +1234,8 @@ export function NetworkPage() {
                           style={{ color: 'hsl(var(--harbor-text-tertiary))' }}
                           title={contact.peerId}
                         >
-                          {contact.displayName.split(' ').map((word) => word[0]).join('').toUpperCase().slice(0, 2)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm" style={{ color: 'hsl(var(--harbor-text-primary))' }}>
-                            {contact.displayName}
-                          </p>
-                          <p
-                            className="text-xs font-mono truncate"
-                            style={{ color: 'hsl(var(--harbor-text-tertiary))' }}
-                            title={contact.peerId}
-                          >
-                            {contact.peerId.slice(0, 12)}...{contact.peerId.slice(-6)}
-                          </p>
-                        </div>
-                        {contact.bio && (
-                          <p
-                            className="text-xs truncate max-w-[200px]"
-                            style={{ color: 'hsl(var(--harbor-text-tertiary))' }}
-                          >
-                            {contact.bio}
-                          </p>
-                        )}
-                        <button
-                          className="p-2 rounded-lg hover:bg-white/10 transition-colors flex-shrink-0"
-                          style={{ color: 'hsl(var(--harbor-text-tertiary))' }}
-                          title="Remove contact"
-                          onClick={async () => {
-                            try {
-                              await contactsService.removeContact(contact.peerId);
-                              await refreshContacts();
-                              toast.success(`Removed ${contact.displayName} from contacts`);
-                            } catch (err) {
-                              toast.error(`Failed to remove contact: ${err}`);
-                            }
-                          }}
-                        >
-                          <TrashIcon className="w-4 h-4" />
-                        </button>
+                          {contact.peerId.slice(0, 12)}...{contact.peerId.slice(-6)}
+                        </p>
                       </div>
                       {contact.bio && (
                         <p
