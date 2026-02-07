@@ -94,7 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
 
             let identify = identify::Behaviour::new(identify::Config::new(
-                "/harbor-relay-smoke/1.0.0".to_string(),
+                "/bastion-relay-smoke/1.0.0".to_string(),
                 key.public(),
             ));
 
@@ -114,6 +114,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Dial the relay
     info!("Dialing relay: {}", relay_addr);
     swarm.dial(relay_addr.clone())?;
+
+    let mut reservation_requested = false;
 
     let mut dial_target: Option<Multiaddr> = match args.dial {
         Some(addr) => Some(addr.parse::<Multiaddr>()?),
@@ -143,23 +145,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             SwarmEvent::Behaviour(SmokeBehaviourEvent::Ping(event)) => {
                 info!("Ping event: {:?}", event);
             }
+            SwarmEvent::Behaviour(SmokeBehaviourEvent::Identify(identify::Event::Received { peer_id, info, .. })) => {
+                info!("Identify received from {}: protocol={}, agent={}", peer_id, info.protocol_version, info.agent_version);
+                info!("  protocols: {:?}", info.protocols);
+
+                // Request relay reservation AFTER identify completes.
+                // At this point the connection is fully negotiated and the relay client
+                // behavior knows about it. Must use the FULL relay address (including
+                // transport) so the relay client transport can resolve the peer.
+                if !reservation_requested {
+                    let circuit_listen_addr: Multiaddr = relay_addr.clone().with(libp2p::multiaddr::Protocol::P2pCircuit);
+                    info!("Requesting relay reservation on {}", circuit_listen_addr);
+                    match swarm.listen_on(circuit_listen_addr.clone()) {
+                        Ok(id) => info!("Relay listener registered: {:?}", id),
+                        Err(e) => error!("Failed to listen on relay circuit {}: {:?}", circuit_listen_addr, e),
+                    }
+                    reservation_requested = true;
+                }
+            }
             SwarmEvent::Behaviour(SmokeBehaviourEvent::Identify(event)) => {
                 info!("Identify event: {:?}", event);
             }
             SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
                 info!("Connection established with {} at {:?}", peer_id, endpoint);
-                
-                // If this is the relay connection, request a relay reservation by listening on circuit
-                if let Some(relay_peer_id) = relay_peer_id_from_addr(&relay_addr) {
-                    if peer_id == relay_peer_id {
-                        info!("Connected to relay, requesting relay reservation...");
-                        let circuit_listen_addr: Multiaddr = format!("/p2p/{}/p2p-circuit", relay_peer_id).parse()?;
-                        if let Err(e) = swarm.listen_on(circuit_listen_addr.clone()) {
-                            error!("Failed to listen on relay circuit {}: {}", circuit_listen_addr, e);
-                        }
-                    }
-                }
-                
+
                 // Once connected to relay, if a dial target was provided, try once.
                 if let Some(target) = dial_target.take() {
                     info!("Dialing target via relay: {}", target);
@@ -182,20 +191,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn debug_event<T: std::fmt::Debug>(event: SwarmEvent<T>) {
-    // Reduce noise; adjust as needed for debugging.
-    if let SwarmEvent::IncomingConnection { .. } = event {
-        info!("Incoming connection event: {:?}", event);
+    match &event {
+        SwarmEvent::IncomingConnection { .. } => info!("Incoming connection event: {:?}", event),
+        SwarmEvent::ListenerClosed { listener_id, reason, .. } => {
+            error!("Listener {:?} closed: {:?}", listener_id, reason);
+        }
+        SwarmEvent::ListenerError { listener_id, error } => {
+            error!("Listener {:?} error: {}", listener_id, error);
+        }
+        _ => info!("Other event: {:?}", event),
     }
 }
 
-/// Extract the peer ID from a multiaddr that ends with /p2p/<peer_id>
-fn relay_peer_id_from_addr(addr: &Multiaddr) -> Option<PeerId> {
-    use libp2p::multiaddr::Protocol;
-    addr.iter().find_map(|p| {
-        if let Protocol::P2p(peer_id_bytes) = p {
-            PeerId::try_from(peer_id_bytes).ok()
-        } else {
-            None
-        }
-    })
-}
