@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Harbor Community Relay Server - NAT traversal + community boards with storage"
+Description: "Bastion Enclave Relay — NAT traversal + community boards with Isnad auth gate"
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -13,12 +13,13 @@ Metadata:
           default: "Relay Configuration"
         Parameters:
           - RelayPort
+          - AuthPort
           - MaxReservations
           - MaxCircuits
       - Label:
-          default: "Community Configuration"
+          default: "Enclave Configuration"
         Parameters:
-          - CommunityName
+          - EnclaveName
 
 Parameters:
   InstanceType:
@@ -43,6 +44,13 @@ Parameters:
     MaxValue: 65535
     Description: "Port for the libp2p relay server"
 
+  AuthPort:
+    Type: Number
+    Default: 4002
+    MinValue: 1024
+    MaxValue: 65535
+    Description: "Port for the Isnad auth gate HTTP endpoint"
+
   MaxReservations:
     Type: Number
     Default: 128
@@ -53,10 +61,10 @@ Parameters:
     Default: 16
     Description: "Maximum number of active relay circuits per peer"
 
-  CommunityName:
+  EnclaveName:
     Type: String
-    Default: "Harbor Community"
-    Description: "Name for your community (shown to peers who join)"
+    Default: "Bastion Enclave"
+    Description: "Name for your enclave (shown to peers who join)"
 
 Conditions:
   HasKeyPair: !Not [!Equals [!Ref KeyPairName, ""]]
@@ -126,7 +134,7 @@ Resources:
   RelaySecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: !Sub "Security group for ${AWS::StackName} Harbor community relay server"
+      GroupDescription: !Sub "Security group for ${AWS::StackName} Bastion enclave relay"
       VpcId: !Ref RelayVPC
       SecurityGroupIngress:
         # libp2p relay port (TCP)
@@ -141,6 +149,12 @@ Resources:
           ToPort: !Ref RelayPort
           CidrIp: 0.0.0.0/0
           Description: libp2p relay UDP/QUIC
+        # Isnad auth gate HTTP
+        - IpProtocol: tcp
+          FromPort: !Ref AuthPort
+          ToPort: !Ref AuthPort
+          CidrIp: 0.0.0.0/0
+          Description: Isnad auth gate HTTP
         # SSH access (only if key pair provided)
         - IpProtocol: tcp
           FromPort: 22
@@ -159,12 +173,12 @@ Resources:
   RelayAddressParameter:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: !Sub "/harbor/${AWS::StackName}/relay-address"
+      Name: !Sub "/bastion/${AWS::StackName}/relay-address"
       Type: String
       Value: "Starting up... check back in 2 minutes"
-      Description: !Sub "Full relay address for Harbor (${AWS::StackName}) - copy this into the app"
+      Description: !Sub "Full relay address for Bastion (${AWS::StackName}) - copy this into the app"
       Tags:
-        Application: harbor-chat
+        Application: bastion
 
   # IAM Role for EC2
   RelayInstanceRole:
@@ -187,7 +201,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - ssm:PutParameter
-                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/harbor/${AWS::StackName}/relay-address"
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/bastion/${AWS::StackName}/relay-address"
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-role"
@@ -238,24 +252,25 @@ Resources:
           #!/bin/bash -xe
           exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
-          echo "=== Starting Harbor Community Relay Setup ==="
+          echo "=== Starting Bastion Enclave Relay Setup ==="
           echo "Region: ${AWS::Region}"
           echo "Stack: ${AWS::StackName}"
           echo "RelayPort: ${RelayPort}"
-          echo "CommunityName: ${CommunityName}"
+          echo "AuthPort: ${AuthPort}"
+          echo "EnclaveName: ${EnclaveName}"
 
-          EXPECTED_SHA256="c5dcb143d69558107ced27a0dfd30542a88a69906aa53404d9b31ef97a1c66a3"
-          BINARY_URL="https://github.com/bakobiibizo/harbor/raw/main/relay-server/bin/harbor-relay"
+          EXPECTED_SHA256="f374844243abdae916761d2f262ec3d8b89e49a566c676838b8d34c6a5c00bb6"
+          BINARY_URL="https://github.com/bakobiibizo/bastion/raw/main/relay-server/bin/bastion-relay"
           RELAY_PEER_ID="12D3KooWHi81G15poZuH4BL5WnifQ3b2S2uSkvsa1wAhBZNA8PW9"
           IDENTITY_KEY_B64="CAESQKx8WZyvKhxB8KflROQ4EB1jdu+FabKRVVTRo99ulO0wdUP+7I9QeNCLNS8XaxV4JejWR1himdtbElg2ImtLBXo="
 
           # Download pre-compiled binary
           echo "Downloading pre-compiled relay binary..."
-          curl -L -o /usr/local/bin/harbor-relay "$BINARY_URL"
+          curl -L -o /usr/local/bin/bastion-relay "$BINARY_URL"
 
           # Verify SHA256 hash
           echo "Verifying binary integrity..."
-          ACTUAL_SHA256=$(sha256sum /usr/local/bin/harbor-relay | awk '{print $1}')
+          ACTUAL_SHA256=$(sha256sum /usr/local/bin/bastion-relay | awk '{print $1}')
           if [ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]; then
             echo "ERROR: SHA256 mismatch!"
             echo "  Expected: $EXPECTED_SHA256"
@@ -264,17 +279,17 @@ Resources:
           fi
           echo "SHA256 verified OK"
 
-          chmod +x /usr/local/bin/harbor-relay
+          chmod +x /usr/local/bin/bastion-relay
 
           # Install static identity key (same peer ID across restarts/redeployments)
           echo "Installing static relay identity key..."
-          mkdir -p /root/.config/harbor-relay
-          echo "$IDENTITY_KEY_B64" | base64 -d > /root/.config/harbor-relay/id.key
+          mkdir -p /root/.config/bastion-relay
+          echo "$IDENTITY_KEY_B64" | base64 -d > /root/.config/bastion-relay/id.key
           echo "Relay Peer ID: $RELAY_PEER_ID"
 
           # Create data directory for SQLite storage
           echo "Creating data directory..."
-          mkdir -p /var/lib/harbor-relay/data
+          mkdir -p /var/lib/bastion-relay/data
 
           # Get public IP using IMDSv2
           echo "Getting public IP..."
@@ -287,11 +302,11 @@ Resources:
           fi
           echo "Public IP: $PUBLIC_IP"
 
-          # Create systemd service (community mode with --community flag)
+          # Create systemd service (enclave mode with Isnad auth gate)
           echo "Creating systemd service..."
-          cat > /etc/systemd/system/libp2p-relay.service << SERVICEEOF
+          cat > /etc/systemd/system/bastion-relay.service << SERVICEEOF
           [Unit]
-          Description=Harbor Community Relay Server
+          Description=Bastion Enclave Relay
           After=network.target
 
           [Service]
@@ -299,7 +314,7 @@ Resources:
           Restart=always
           RestartSec=10
           Environment=RUST_LOG=info
-          ExecStart=/usr/local/bin/harbor-relay --port ${RelayPort} --announce-ip $PUBLIC_IP --max-reservations ${MaxReservations} --max-circuits-per-peer ${MaxCircuits} --community --community-name "${CommunityName}" --data-dir /var/lib/harbor-relay/data
+          ExecStart=/usr/local/bin/bastion-relay --port ${RelayPort} --auth-port ${AuthPort} --announce-ip $PUBLIC_IP --max-reservations ${MaxReservations} --max-circuits-per-peer ${MaxCircuits} --enclave --enclave-name "${EnclaveName}" --data-dir /var/lib/bastion-relay/data
           StandardOutput=journal
           StandardError=journal
 
@@ -310,17 +325,17 @@ Resources:
           # Start the relay service
           echo "Starting relay service..."
           systemctl daemon-reload
-          systemctl enable libp2p-relay
-          systemctl start libp2p-relay
+          systemctl enable bastion-relay
+          systemctl start bastion-relay
 
           # Wait for startup
           echo "Waiting for relay to start (10 seconds)..."
           sleep 10
 
-          systemctl status libp2p-relay --no-pager || true
+          systemctl status bastion-relay --no-pager || true
 
           # Build relay address using known peer ID (no need to extract from logs)
-          SSM_PARAM_NAME="/harbor/${AWS::StackName}/relay-address"
+          SSM_PARAM_NAME="/bastion/${AWS::StackName}/relay-address"
           RELAY_ADDRESS="/ip4/$PUBLIC_IP/tcp/${RelayPort}/p2p/$RELAY_PEER_ID"
 
           echo "Relay address: $RELAY_ADDRESS"
@@ -333,33 +348,38 @@ Resources:
             --region ${AWS::Region}
 
           echo "=== SUCCESS ==="
-          echo "YOUR RELAY ADDRESS (copy this to Harbor):"
+          echo "YOUR RELAY ADDRESS:"
           echo "$RELAY_ADDRESS"
-          echo "Community: ${CommunityName}"
+          echo "Enclave: ${EnclaveName}"
+          echo "Auth gate: http://$PUBLIC_IP:${AuthPort}"
           echo "=== Setup Complete ==="
 
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-server"
         - Key: Application
-          Value: harbor-chat
+          Value: bastion
 
 Outputs:
   RelayAddress:
     Description: "Your relay address (once the EIP is assigned)"
     Value: !Sub "/ip4/${RelayEIP}/tcp/${RelayPort}/p2p/12D3KooWHi81G15poZuH4BL5WnifQ3b2S2uSkvsa1wAhBZNA8PW9"
 
+  AuthGateURL:
+    Description: "Isnad auth gate endpoint"
+    Value: !Sub "http://${RelayEIP}:${AuthPort}"
+
   Step1WaitTwoMinutes:
     Description: "STEP 1: Wait ~1 minute for the server to start"
     Value: "Uses pre-compiled binary with static identity - starts quickly."
 
   Step2CopyRelayAddress:
-    Description: "STEP 2: Copy the RelayAddress output above into Harbor"
+    Description: "STEP 2: Copy the RelayAddress output above"
     Value: "Paste it into Network > Advanced > Add Relay Address"
 
-  CommunityNameOutput:
-    Description: "Community name"
-    Value: !Ref CommunityName
+  EnclaveNameOutput:
+    Description: "Enclave name"
+    Value: !Ref EnclaveName
 
   RelayPublicIP:
     Description: "Public IP address (for reference)"

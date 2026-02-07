@@ -13,12 +13,12 @@ cargo build --release --manifest-path "$RELAY_DIR/Cargo.toml"
 
 echo "[+] Copying binary to $BIN_DIR..."
 mkdir -p "$BIN_DIR"
-cp "$RELAY_DIR/target/release/harbor-relay" "$BIN_DIR/harbor-relay"
+cp "$RELAY_DIR/target/release/bastion-relay" "$BIN_DIR/bastion-relay"
 
 echo "[+] Computing SHA256..."
-SHA256=$(sha256sum "$BIN_DIR/harbor-relay" | awk '{print $1}')
-echo "$SHA256  relay-server/bin/harbor-relay" > "$BIN_DIR/harbor-relay.sha256"
+SHA256=$(sha256sum "$BIN_DIR/bastion-relay" | awk '{print $1}')
+echo "$SHA256  relay-server/bin/bastion-relay" > "$BIN_DIR/bastion-relay.sha256"
 
 echo "[+] Done."
-echo "    Binary: $BIN_DIR/harbor-relay"
+echo "    Binary: $BIN_DIR/bastion-relay"
 echo "    SHA256: $SHA256"
