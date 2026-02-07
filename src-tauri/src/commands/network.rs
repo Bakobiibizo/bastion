@@ -404,14 +404,22 @@ pub async fn add_contact_from_string(
     let bundle: ContactBundle = serde_json::from_slice(&json_bytes)
         .map_err(|e| AppError::Validation(format!("Invalid contact data: {}", e)))?;
 
-    // Decode the keys
-    let public_key = base64::engine::general_purpose::STANDARD
+    // Decode the keys — contact strings have double-base64-encoded keys:
+    // base64(base64(32 raw bytes)). Decode both layers, fall back to single decode
+    // for correctly-encoded keys.
+    let pk_once = base64::engine::general_purpose::STANDARD
         .decode(&bundle.public_key)
         .map_err(|e| AppError::Validation(format!("Invalid public key: {}", e)))?;
+    let public_key = base64::engine::general_purpose::STANDARD
+        .decode(&pk_once)
+        .unwrap_or(pk_once);
 
-    let x25519_public = base64::engine::general_purpose::STANDARD
+    let x25519_once = base64::engine::general_purpose::STANDARD
         .decode(&bundle.x25519_public)
         .map_err(|e| AppError::Validation(format!("Invalid x25519 key: {}", e)))?;
+    let x25519_public = base64::engine::general_purpose::STANDARD
+        .decode(&x25519_once)
+        .unwrap_or(x25519_once);
 
     // Extract peer ID from multiaddr
     let peer_id = bundle
