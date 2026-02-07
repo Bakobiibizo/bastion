@@ -52,10 +52,10 @@ pub fn router() -> Router<Arc<AppState>> {
         // Messaging
         .route("/api/messages/send", post(messaging::send_message))
         .route("/api/messages/unread", get(messaging::get_total_unread_count))
-        .route("/api/messages/{peerId}", get(messaging::get_messages))
+        .route("/api/messages/:peerId", get(messaging::get_messages))
         .route("/api/conversations", get(messaging::get_conversations))
         .route(
-            "/api/conversations/{peerId}/read",
+            "/api/conversations/:peerId/read",
             post(messaging::mark_conversation_read),
         )
         // Contacts
@@ -65,9 +65,9 @@ pub fn router() -> Router<Arc<AppState>> {
             "/api/contacts/from-string",
             post(contacts::add_contact_from_string),
         )
-        .route("/api/contacts/{peerId}", delete(contacts::remove_contact))
+        .route("/api/contacts/:peerId", delete(contacts::remove_contact))
         .route(
-            "/api/contacts/{peerId}/block",
+            "/api/contacts/:peerId/block",
             post(contacts::block_contact),
         )
         // Permissions
@@ -77,7 +77,7 @@ pub fn router() -> Router<Arc<AppState>> {
             post(permissions::grant_all_permissions),
         )
         .route(
-            "/api/permissions/{grantId}",
+            "/api/permissions/:grantId",
             delete(permissions::revoke_permission),
         )
         .route(
@@ -88,24 +88,24 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/api/communities", get(boards::get_communities))
         .route("/api/communities/join", post(boards::join_community))
         .route(
-            "/api/communities/{relayPeerId}",
+            "/api/communities/:relayPeerId",
             delete(boards::leave_community),
         )
-        .route("/api/boards/{relayPeerId}", get(boards::get_boards))
+        .route("/api/boards/:relayPeerId", get(boards::get_boards))
         .route(
-            "/api/boards/{relayPeerId}/{boardId}/posts",
+            "/api/boards/:relayPeerId/{boardId}/posts",
             get(boards::get_board_posts),
         )
         .route(
-            "/api/boards/{relayPeerId}/{boardId}/posts",
+            "/api/boards/:relayPeerId/{boardId}/posts",
             post(boards::submit_board_post),
         )
         .route(
-            "/api/boards/posts/{postId}",
+            "/api/boards/posts/:postId",
             delete(boards::delete_board_post),
         )
         .route(
-            "/api/boards/{relayPeerId}/{boardId}/sync",
+            "/api/boards/:relayPeerId/{boardId}/sync",
             post(boards::sync_board),
         )
         // Auth (Isnad CAPTCHA)
