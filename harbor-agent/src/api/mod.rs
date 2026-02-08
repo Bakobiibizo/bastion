@@ -93,11 +93,11 @@ pub fn router() -> Router<Arc<AppState>> {
         )
         .route("/api/boards/:relayPeerId", get(boards::get_boards))
         .route(
-            "/api/boards/:relayPeerId/{boardId}/posts",
+            "/api/boards/:relayPeerId/:boardId/posts",
             get(boards::get_board_posts),
         )
         .route(
-            "/api/boards/:relayPeerId/{boardId}/posts",
+            "/api/boards/:relayPeerId/:boardId/posts",
             post(boards::submit_board_post),
         )
         .route(
@@ -105,7 +105,7 @@ pub fn router() -> Router<Arc<AppState>> {
             delete(boards::delete_board_post),
         )
         .route(
-            "/api/boards/:relayPeerId/{boardId}/sync",
+            "/api/boards/:relayPeerId/:boardId/sync",
             post(boards::sync_board),
         )
         // Auth (Isnad CAPTCHA)

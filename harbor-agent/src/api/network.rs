@@ -78,6 +78,7 @@ pub async fn start_network(
     service.set_permissions_service(state.permissions_service.clone());
     service.set_posts_service(state.posts_service.clone());
     service.set_content_sync_service(state.content_sync_service.clone());
+    service.set_board_service(state.board_service.clone());
 
     // Store the handle
     state.network.set_handle(handle).await;
